@@ -38,6 +38,7 @@ import {
   Award,
   BarChart3,
   Edit2,
+  Calculator,
 } from 'lucide-react';
 import {
   Wallet,
@@ -49,9 +50,12 @@ import {
   InvestmentCategory,
   MarketplaceProduct,
   MarketplaceSale,
+  Product,
 } from '@/types';
 import { formatRupiah, formatTanggal, triggerHaptic, generateUUID, isValidUUID } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
+import ShopExpenseModal from '@/components/ShopExpenseModal';
+import HppCalculatorModal from '@/components/HppCalculatorModal';
 
 interface FinanceViewProps {
   currentMember: FamilyMember;
@@ -59,6 +63,8 @@ interface FinanceViewProps {
   expenses: PersonalExpense[];
   onRefreshFinance: () => void;
   isDbConnected: boolean;
+  products?: Product[];
+  onProductsUpdate?: () => void;
 }
 
 const DEFAULT_FALLBACK_UUID = '00000000-0000-0000-0000-000000000001';
@@ -100,6 +106,8 @@ export default function FinanceView({
   expenses,
   onRefreshFinance,
   isDbConnected,
+  products = [],
+  onProductsUpdate,
 }: FinanceViewProps) {
   // Pastikan ID user selalu valid UUID agar Postgres tidak error 22P02
   const activeUserId = useMemo(() => {
@@ -127,6 +135,8 @@ export default function FinanceView({
   const [isAddingTransaction, setIsAddingTransaction] = useState(false);
   const [isAddingWallet, setIsAddingWallet] = useState(false);
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+  const [isShopExpenseOpen, setIsShopExpenseOpen] = useState(false);
+  const [isHppModalOpen, setIsHppModalOpen] = useState(false);
 
   // Form Transaksi
   const [txType, setTxType] = useState<'expense' | 'income'>('expense');
@@ -1496,6 +1506,7 @@ export default function FinanceView({
         {/* QUICK BUTTONS */}
         <div className="grid grid-cols-2 gap-2 mt-3 pt-2.5 border-t border-amber-600/30">
           <button
+            type="button"
             onClick={() => {
               triggerHaptic(20);
               setTxType('expense');
@@ -1509,6 +1520,7 @@ export default function FinanceView({
           </button>
 
           <button
+            type="button"
             onClick={() => {
               triggerHaptic(20);
               setTxType('income');
@@ -1519,6 +1531,35 @@ export default function FinanceView({
           >
             <TrendingUp className="w-4 h-4 text-emerald-600" />
             <span>Catat Masuk</span>
+          </button>
+        </div>
+
+        {/* TOMBOL BANTU ORANG TUA: BELANJA KAS TOKO & KALKULATOR HPP */}
+        <div className="grid grid-cols-2 gap-2 mt-2">
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic(20);
+              setIsShopExpenseOpen(true);
+            }}
+            className="py-2.5 px-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs flex items-center justify-center space-x-1.5 shadow-2xs border border-amber-600/30 transition-colors"
+            style={{ minHeight: '44px' }}
+          >
+            <Store className="w-4 h-4 text-amber-950 shrink-0" />
+            <span className="truncate">Belanja Kas Toko (Modal Rp 0)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic(20);
+              setIsHppModalOpen(true);
+            }}
+            className="py-2.5 px-3 rounded-xl bg-white/95 hover:bg-white text-slate-900 font-extrabold text-xs flex items-center justify-center space-x-1.5 shadow-2xs border border-slate-300 transition-colors"
+            style={{ minHeight: '44px' }}
+          >
+            <Calculator className="w-4 h-4 text-emerald-700 shrink-0" />
+            <span className="truncate">Kalkulator HPP Warung</span>
           </button>
         </div>
       </div>
@@ -4041,6 +4082,29 @@ export default function FinanceView({
           </div>
         </div>
       )}
+
+      {/* MODAL BELANJA KAS TOKO (MODAL RP 0) */}
+      <ShopExpenseModal
+        isOpen={isShopExpenseOpen}
+        onClose={() => setIsShopExpenseOpen(false)}
+        wallets={wallets}
+        currentMemberId={activeUserId}
+        isDbConnected={isDbConnected}
+        onRefreshFinance={onRefreshFinance}
+        onProductsUpdate={onProductsUpdate || (() => {})}
+      />
+
+      {/* MODAL KALKULATOR HPP */}
+      <HppCalculatorModal
+        isOpen={isHppModalOpen}
+        onClose={() => setIsHppModalOpen(false)}
+        products={products}
+        wallets={wallets}
+        currentMemberId={activeUserId}
+        isDbConnected={isDbConnected}
+        onRefreshFinance={onRefreshFinance}
+        onProductsUpdate={onProductsUpdate}
+      />
     </div>
   );
 }

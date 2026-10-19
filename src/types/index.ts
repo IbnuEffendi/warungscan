@@ -197,3 +197,24 @@ export interface MarketplaceSale {
   created_at: string;
 }
 
+export interface HppIngredient {
+  id: string;
+  name: string;
+  cost: number;
+}
+
+export interface HppRecipe {
+  id: string;
+  name: string;
+  type: 'bulk_to_retail' | 'recipe';
+  portions: number;
+  ingredients: HppIngredient[];
+  total_cost: number;
+  cost_per_portion: number;
+  selling_price: number;
+  margin_percent: number;
+  profit_per_portion: number;
+  created_at: string;
+}
+
+

@@ -308,6 +308,9 @@ export default function Home() {
             cart={cart}
             setCart={setCart}
             isDbConnected={isDbConnected}
+            wallets={wallets}
+            currentMemberId={currentMember.id}
+            onRefreshFinance={loadFinanceData}
           />
         )}
 
@@ -343,6 +346,8 @@ export default function Home() {
             expenses={personalExpenses}
             onRefreshFinance={loadFinanceData}
             isDbConnected={isDbConnected}
+            products={products}
+            onProductsUpdate={loadProducts}
           />
         )}
       </div>

@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { Search, Plus, Edit2, Trash2, X, Check, Package, AlertTriangle, Utensils } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, X, Check, Package, AlertTriangle, Utensils, Calculator } from 'lucide-react';
 import { Product } from '@/types';
 import { formatRupiah, triggerHaptic, findBestProductMatch, generateUUID } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
+import HppCalculatorModal from '@/components/HppCalculatorModal';
 
 interface ProductsViewProps {
   products: Product[];
@@ -22,6 +23,7 @@ export default function ProductsView({
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [isHppModalOpen, setIsHppModalOpen] = useState(false);
 
   // Form State
   const [name, setName] = useState('');
@@ -379,37 +381,73 @@ export default function ProductsView({
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-2.5">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Harga Modal (Rp)
+              <div>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-1">
+                  <label className="block text-xs font-bold text-slate-700">
+                    Harga Modal (HPP Rp)
                   </label>
-                  <input
-                    type="number"
-                    required
-                    value={costPrice || ''}
-                    onChange={(e) =>
-                      setCostPrice(Math.max(0, parseInt(e.target.value, 10) || 0))
-                    }
-                    placeholder="0"
-                    className="w-full p-3 rounded-xl border border-slate-300 font-bold text-slate-900 bg-slate-50 focus:bg-white focus:outline-none"
-                  />
+                  <div className="flex items-center space-x-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        triggerHaptic(15);
+                        setCostPrice(0);
+                      }}
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-md border transition-all ${
+                        costPrice === 0
+                          ? 'bg-amber-100 border-amber-300 text-amber-900 font-black'
+                          : 'bg-slate-100 border-slate-200 text-slate-600 hover:text-slate-900'
+                      }`}
+                      title="Untuk barang kulakan yang sudah dipotong dari kas toko (misal kerupuk 1 bal)"
+                    >
+                      Modal Rp 0 (Kas Toko)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        triggerHaptic(15);
+                        setIsHppModalOpen(true);
+                      }}
+                      className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300 flex items-center space-x-1 transition-colors"
+                      title="Bantu hitung HPP racikan / borongan"
+                    >
+                      <Calculator className="w-3 h-3 text-emerald-700" />
+                      <span>Hitung HPP</span>
+                    </button>
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-emerald-800 mb-1">
-                    Harga Jual (Rp)
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    value={sellingPrice || ''}
-                    onChange={(e) =>
-                      setSellingPrice(Math.max(0, parseInt(e.target.value, 10) || 0))
-                    }
-                    placeholder="0"
-                    className="w-full p-3 rounded-xl border-2 border-emerald-500 font-black text-emerald-900 bg-emerald-50/50 focus:bg-white focus:outline-none"
-                  />
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <input
+                      type="number"
+                      required
+                      value={costPrice}
+                      onChange={(e) =>
+                        setCostPrice(Math.max(0, parseInt(e.target.value, 10) || 0))
+                      }
+                      placeholder="0"
+                      className="w-full p-3 rounded-xl border border-slate-300 font-bold text-slate-900 bg-slate-50 focus:bg-white focus:outline-none"
+                    />
+                    {costPrice === 0 && (
+                      <span className="text-[10px] text-amber-800 font-semibold block mt-1 leading-tight">
+                        Modal Rp 0: Seluruh uang penjualan dihitung 100% masuk ke omset kas toko.
+                      </span>
+                    )}
+                  </div>
+
+                  <div>
+                    <input
+                      type="number"
+                      required
+                      value={sellingPrice || ''}
+                      onChange={(e) =>
+                        setSellingPrice(Math.max(0, parseInt(e.target.value, 10) || 0))
+                      }
+                      placeholder="0"
+                      className="w-full p-3 rounded-xl border-2 border-emerald-500 font-black text-emerald-900 bg-emerald-50/50 focus:bg-white focus:outline-none"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -444,6 +482,20 @@ export default function ProductsView({
           </div>
         </div>
       )}
+
+      {/* MODAL KALKULATOR HPP */}
+      <HppCalculatorModal
+        isOpen={isHppModalOpen}
+        onClose={() => setIsHppModalOpen(false)}
+        products={products}
+        onApplyHpp={(calculatedCost, suggestedSelling, calculatedName) => {
+          setCostPrice(calculatedCost);
+          if (suggestedSelling > 0) setSellingPrice(suggestedSelling);
+          if (calculatedName && !name) setName(calculatedName);
+        }}
+        onProductsUpdate={onProductsUpdate}
+        isDbConnected={isDbConnected}
+      />
     </div>
   );
 }

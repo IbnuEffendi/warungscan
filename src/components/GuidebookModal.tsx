@@ -173,6 +173,22 @@ export default function GuidebookModal({ isOpen, onClose }: GuidebookModalProps)
                   </div>
                 </div>
               </div>
+
+              {/* FITUR KHUSUS ORANG TUA: BELANJA KAS TOKO & KALKULATOR HPP */}
+              <div className="p-3.5 bg-amber-50 rounded-2xl border border-amber-200/80 space-y-2 mt-2">
+                <h5 className="font-extrabold text-amber-950 text-xs flex items-center space-x-1.5">
+                  <span>💡</span>
+                  <span>Fitur Khusus: Belanja Kas Toko & Kalkulator HPP</span>
+                </h5>
+                <div className="space-y-1.5 text-xs text-amber-900">
+                  <p>
+                    <strong>1. Belanja Kas Toko (Modal Rp 0):</strong> Solusi jika orang tua malas membagi HPP kerupuk 1 bal atau es balok. Uang beli dipotong dari kas toko di awal, lalu saat dijual di kasir modalnya Rp 0. Hasil penjualan 100% masuk ke omset toko.
+                  </p>
+                  <p>
+                    <strong>2. Kalkulator HPP Warung:</strong> Membantu menghitung modal asli es teh manis, tahu walik, kopi seduh, atau es batu eceran. Dilengkapi contoh resep warung siap pakai yang bisa langsung diterapkan ke kasir dengan 1 klik!
+                  </p>
+                </div>
+              </div>
             </div>
           )}
 

@@ -13,10 +13,14 @@ import {
   AlertCircle,
   Utensils,
   Wallet,
+  Store,
+  Calculator,
 } from 'lucide-react';
-import { Product, CartItem } from '@/types';
+import { Product, CartItem, Wallet as WalletType } from '@/types';
 import { formatRupiah, triggerHaptic } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
+import ShopExpenseModal from '@/components/ShopExpenseModal';
+import HppCalculatorModal from '@/components/HppCalculatorModal';
 
 interface PosViewProps {
   products: Product[];
@@ -24,6 +28,9 @@ interface PosViewProps {
   cart: CartItem[];
   setCart: React.Dispatch<React.SetStateAction<CartItem[]>>;
   isDbConnected: boolean;
+  wallets?: WalletType[];
+  currentMemberId?: string;
+  onRefreshFinance?: () => void;
 }
 
 const SELF_CONSUMPTION_REASONS = [
@@ -39,6 +46,9 @@ export default function PosView({
   cart,
   setCart,
   isDbConnected,
+  wallets = [],
+  currentMemberId = '',
+  onRefreshFinance,
 }: PosViewProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Semua');
@@ -48,6 +58,10 @@ export default function PosView({
   const [cashAmount, setCashAmount] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [completedTransaction, setCompletedTransaction] = useState<any>(null);
+
+  // Modal Belanja Kas Toko & Kalkulator HPP
+  const [isShopExpenseOpen, setIsShopExpenseOpen] = useState(false);
+  const [isHppModalOpen, setIsHppModalOpen] = useState(false);
 
   // Ambil daftar kategori unik
   const categories = useMemo(() => {
@@ -273,6 +287,35 @@ export default function PosView({
               <X className="w-5 h-5" />
             </button>
           )}
+        </div>
+
+        {/* Tombol Aksi Cepat: Belanja Kas Toko & Hitung HPP */}
+        <div className="grid grid-cols-2 gap-2 mt-2">
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic(20);
+              setIsShopExpenseOpen(true);
+            }}
+            className="py-2 px-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs flex items-center justify-center space-x-1.5 shadow-2xs transition-colors"
+            style={{ minHeight: '44px' }}
+          >
+            <Store className="w-4 h-4 shrink-0" />
+            <span className="truncate">Belanja Kas Toko (Modal Rp 0)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              triggerHaptic(20);
+              setIsHppModalOpen(true);
+            }}
+            className="py-2 px-2.5 rounded-xl bg-emerald-100 hover:bg-emerald-200 text-emerald-950 border border-emerald-300 font-extrabold text-xs flex items-center justify-center space-x-1.5 transition-colors"
+            style={{ minHeight: '44px' }}
+          >
+            <Calculator className="w-4 h-4 shrink-0 text-emerald-800" />
+            <span className="truncate">Kalkulator HPP</span>
+          </button>
         </div>
 
         {/* Filter Kategori */}
@@ -719,6 +762,29 @@ export default function PosView({
           </div>
         </div>
       )}
+
+      {/* MODAL BELANJA KAS TOKO (MODAL RP 0) */}
+      <ShopExpenseModal
+        isOpen={isShopExpenseOpen}
+        onClose={() => setIsShopExpenseOpen(false)}
+        wallets={wallets}
+        currentMemberId={currentMemberId}
+        isDbConnected={isDbConnected}
+        onRefreshFinance={onRefreshFinance || (() => {})}
+        onProductsUpdate={onProductsUpdate}
+      />
+
+      {/* MODAL KALKULATOR HPP */}
+      <HppCalculatorModal
+        isOpen={isHppModalOpen}
+        onClose={() => setIsHppModalOpen(false)}
+        products={products}
+        wallets={wallets}
+        currentMemberId={currentMemberId}
+        isDbConnected={isDbConnected}
+        onRefreshFinance={onRefreshFinance}
+        onProductsUpdate={onProductsUpdate}
+      />
     </div>
   );
 }
