@@ -32,7 +32,7 @@ export default function RootLayout({
   return (
     <html lang="id" className="h-full bg-slate-100 select-none">
       <body className="min-h-full flex flex-col font-sans text-slate-900 bg-slate-100 antialiased">
-        <div className="w-full max-w-md mx-auto min-h-screen bg-white shadow-xl flex flex-col relative pb-20">
+        <div className="w-full max-w-md sm:max-w-xl md:max-w-2xl mx-auto min-h-screen bg-white shadow-2xl flex flex-col relative border-x border-slate-200/80">
           {children}
         </div>
       </body>

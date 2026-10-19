@@ -118,7 +118,8 @@ export default function Home() {
         .select('*')
         .order('name', { ascending: true });
 
-      if (error || !data || data.length === 0) {
+      if (error) {
+        // Hanya tandai belum terhubung jika Supabase mengembalikan error (misal tabel belum dibuat)
         setIsDbConnected(false);
         const stored = localStorage.getItem('warungscan_products');
         if (stored) {
@@ -128,9 +129,44 @@ export default function Home() {
           localStorage.setItem('warungscan_products', JSON.stringify(DEFAULT_SAMPLE_PRODUCTS));
         }
       } else {
+        // Tabel produk di Supabase ada dan terhubung dengan baik!
         setIsDbConnected(true);
-        setProducts(data);
-        localStorage.setItem('warungscan_products', JSON.stringify(data));
+
+        if (data && data.length > 0) {
+          setProducts(data);
+          localStorage.setItem('warungscan_products', JSON.stringify(data));
+        } else {
+          // Tabel di Supabase kosong (misal baru saja di-reset)
+          // Cek apakah ada data lokal yang perlu disinkronkan ke cloud
+          const stored = localStorage.getItem('warungscan_products');
+          if (stored) {
+            try {
+              const parsed = JSON.parse(stored);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                setProducts(parsed);
+                // Upload/sinkronkan otomatis produk lokal ke database cloud
+                for (const p of parsed) {
+                  await supabase.from('products').upsert(
+                    {
+                      name: p.name,
+                      cost_price: p.cost_price || 0,
+                      selling_price: p.selling_price || 0,
+                      stock: p.stock || 0,
+                      category: p.category || 'Umum',
+                    },
+                    { onConflict: 'name' }
+                  );
+                }
+              } else {
+                setProducts([]);
+              }
+            } catch {
+              setProducts([]);
+            }
+          } else {
+            setProducts([]);
+          }
+        }
       }
     } catch {
       setIsDbConnected(false);

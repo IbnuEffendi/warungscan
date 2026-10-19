@@ -55,7 +55,7 @@ export default function Navbar({ activeTab, setActiveTab, cartCount }: NavbarPro
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-200 max-w-md mx-auto shadow-lg">
+    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-200 max-w-md sm:max-w-xl md:max-w-2xl mx-auto shadow-lg">
       <div className="grid grid-cols-5 h-17">
         {navItems.map((item) => {
           const isActive = activeTab === item.id;

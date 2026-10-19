@@ -435,7 +435,17 @@ export default function SettingsModal({
         await supabase.from('products').delete().neq('name', '___dummy___');
       }
 
-      localStorage.clear();
+      // Bersihkan data barang & transaksi lokal
+      localStorage.removeItem('warungscan_products');
+      localStorage.removeItem('warungscan_sales');
+      localStorage.removeItem('warungscan_restock');
+      localStorage.removeItem('warungscan_self_consumption');
+      localStorage.removeItem('warungscan_personal_expenses');
+
+      // Pastikan sesi akun yang sedang aktif tetap tersimpan
+      if (currentMember?.id) {
+        localStorage.setItem('warungscan_active_user_id', currentMember.id);
+      }
 
       alert('Database berhasil direset bersih.');
       setIsResetConfirmOpen(false);
