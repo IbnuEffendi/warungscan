@@ -14,6 +14,7 @@ import SelfConsumptionModal from '@/components/SelfConsumptionModal';
 import FamilyAuthModal from '@/components/FamilyAuthModal';
 import AppGateLock from '@/components/AppGateLock';
 import GuidebookModal from '@/components/GuidebookModal';
+import NewDeviceAuthModal from '@/components/NewDeviceAuthModal';
 import {
   Product,
   CartItem,
@@ -78,6 +79,7 @@ export default function Home() {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isSelfConsumptionModalOpen, setIsSelfConsumptionModalOpen] = useState(false);
   const [isGuidebookOpen, setIsGuidebookOpen] = useState(false);
+  const [isNewDeviceModalOpen, setIsNewDeviceModalOpen] = useState(false);
 
   // Security Gate Lock Toko
   const [isGateUnlocked, setIsGateUnlocked] = useState(false);
@@ -139,14 +141,20 @@ export default function Home() {
   // Ambil Data Keluarga, Dompet, Pengeluaran & Goal
   const loadFinanceData = useCallback(async () => {
     try {
+      const savedUserId = localStorage.getItem('warungscan_active_user_id');
+
       if (isDbConnected) {
         const { data: famData } = await supabase.from('family_members').select('*');
         if (famData && famData.length > 0) {
           setFamilyMembers(famData);
-          setCurrentMember((prev) => {
-            const found = famData.find((m) => m.id === prev.id);
-            return found || famData[0];
-          });
+          if (savedUserId) {
+            const matched = famData.find((m) => m.id === savedUserId);
+            if (matched) setCurrentMember(matched);
+            else setCurrentMember(famData[0]);
+          } else {
+            // Perangkat Baru! Belum login ke profil akun tertentu
+            setIsNewDeviceModalOpen(true);
+          }
         }
 
         const { data: walData } = await supabase.from('wallets').select('*');
@@ -163,7 +171,13 @@ export default function Home() {
           const parsed = JSON.parse(localFam);
           if (Array.isArray(parsed) && parsed.length > 0) {
             setFamilyMembers(parsed);
-            setCurrentMember((prev) => parsed.find((m: any) => m.id === prev.id) || parsed[0]);
+            if (savedUserId) {
+              const matched = parsed.find((m: any) => m.id === savedUserId);
+              if (matched) setCurrentMember(matched);
+              else setCurrentMember(parsed[0]);
+            } else {
+              setIsNewDeviceModalOpen(true);
+            }
           }
         }
 
@@ -291,11 +305,27 @@ export default function Home() {
         isOpen={isFamilyAuthOpen}
         onClose={() => setIsFamilyAuthOpen(false)}
         currentMember={currentMember}
-        onSelectMember={(m) => setCurrentMember(m)}
+        onSelectMember={(m) => {
+          setCurrentMember(m);
+          localStorage.setItem('warungscan_active_user_id', m.id);
+        }}
         familyMembers={familyMembers}
         onRefreshMembers={loadFinanceData}
         isDbConnected={isDbConnected}
         onUnlockSuperAdmin={handleElevateSuperAdmin}
+      />
+
+      {/* MODAL PERANGKAT BARU: PILIH AKUN LAMA ATAU BUAT AKUN BARU */}
+      <NewDeviceAuthModal
+        isOpen={isNewDeviceModalOpen}
+        familyMembers={familyMembers}
+        onSelectMember={(m) => {
+          setCurrentMember(m);
+          localStorage.setItem('warungscan_active_user_id', m.id);
+          setIsNewDeviceModalOpen(false);
+        }}
+        onRefreshMembers={loadFinanceData}
+        isDbConnected={isDbConnected}
       />
 
       {/* MODAL PANDUAN DATABASE SUPABASE */}
@@ -314,6 +344,7 @@ export default function Home() {
         currentMember={currentMember}
         onUpdateCurrentMember={(updated) => {
           setCurrentMember(updated);
+          localStorage.setItem('warungscan_active_user_id', updated.id);
           setFamilyMembers((prev) =>
             prev.map((m) => (m.id === updated.id ? updated : m))
           );

@@ -113,42 +113,42 @@ export default function Header({
 
   return (
     <>
-      <header className="sticky top-0 z-30 bg-emerald-800 text-white px-3 py-2 shadow-md space-y-1.5">
-        <div className="flex items-center justify-between">
+      <header className="sticky top-0 z-30 bg-emerald-800 text-white w-full px-2 sm:px-3 py-1.5 sm:py-2 shadow-md">
+        <div className="flex items-center justify-between w-full max-w-full gap-1">
           {/* Tombol Profil Pengguna Keluarga */}
           <button
             onClick={() => {
               triggerHaptic(20);
               onOpenFamilyAuth();
             }}
-            className="flex items-center space-x-2 bg-emerald-900/80 hover:bg-emerald-950 py-1.5 px-2.5 rounded-xl border border-emerald-400/30 transition-all text-left"
+            className="flex items-center space-x-1.5 bg-emerald-900/80 hover:bg-emerald-950 py-1 sm:py-1.5 px-2 sm:px-2.5 rounded-xl border border-emerald-400/30 transition-all text-left shrink-0"
             title="Klik untuk kelola akun"
           >
             <div
-              className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs text-white ${
+              className={`w-6 h-6 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center font-bold text-xs text-white shrink-0 ${
                 isSuperAdmin ? 'bg-emerald-600' : 'bg-blue-600'
               }`}
             >
               {currentMember.name.charAt(0).toUpperCase()}
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center space-x-1">
-                <span className="text-xs font-black text-white max-w-[120px] truncate">
+                <span className="text-xs font-black text-white max-w-[90px] sm:max-w-[130px] truncate block">
                   {currentMember.name}
                 </span>
                 {isSuperAdmin && <Shield className="w-3 h-3 text-yellow-300 shrink-0" />}
               </div>
-              <span className="text-[10px] text-emerald-300 font-semibold block leading-tight">
+              <span className="text-[9px] sm:text-[10px] text-emerald-300 font-semibold block leading-tight">
                 {isSuperAdmin ? 'Super Admin' : 'Kasir'}
               </span>
             </div>
           </button>
 
-          {/* Logo / Brand Tengah (Secret 5x Tap) */}
+          {/* Logo / Brand Tengah (Secret 5x Tap, Tersembunyi di Layar Sempit agar Tidak Desak-desakan) */}
           <button
             type="button"
             onClick={handleLogoTap}
-            className="flex items-center space-x-1.5 px-2 py-1 rounded-xl hover:bg-emerald-700/50 active:scale-95 transition-all text-emerald-100"
+            className="hidden sm:flex items-center space-x-1.5 px-2 py-1 rounded-xl hover:bg-emerald-700/50 active:scale-95 transition-all text-emerald-100 shrink-0"
             title="WarungScan"
           >
             <Store className="w-4 h-4 text-emerald-300" />
@@ -156,19 +156,19 @@ export default function Header({
           </button>
 
           {/* Action Buttons Kanan */}
-          <div className="flex items-center space-x-1">
+          <div className="flex items-center space-x-1 shrink-0">
             {/* Tombol Buku Panduan & FAQ Lengkap (Selalu Ada di Bar Atas) */}
             <button
               onClick={() => {
                 triggerHaptic(20);
                 onOpenGuidebook();
               }}
-              className="py-1.5 px-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs flex items-center space-x-1 shadow-xs transition-colors"
+              className="py-1 sm:py-1.5 px-2 sm:px-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs flex items-center space-x-1 shadow-xs transition-colors shrink-0"
               title="Buku Panduan & FAQ Bantuan Semua Fitur"
               aria-label="Panduan & FAQ"
             >
               <BookOpen className="w-3.5 h-3.5 text-slate-950" />
-              <span className="hidden sm:inline">Panduan</span>
+              <span className="hidden xs:inline">Panduan</span>
             </button>
 
             {/* Tombol Kunci Toko (Quick Screen Lock) */}
@@ -177,11 +177,11 @@ export default function Header({
                 triggerHaptic(20);
                 onLockApp();
               }}
-              className="p-2 rounded-xl bg-emerald-900/70 border border-emerald-400/30 text-emerald-100 hover:bg-emerald-900 hover:text-white transition-colors"
+              className="p-1.5 sm:p-2 rounded-xl bg-emerald-900/70 border border-emerald-400/30 text-emerald-100 hover:bg-emerald-900 hover:text-white transition-colors shrink-0"
               title="Kunci Toko (Amankan Layar Saat Ditinggal)"
               aria-label="Kunci Toko"
             >
-              <Lock className="w-4 h-4" />
+              <Lock className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </button>
 
             {/* Tombol Pengaturan Data */}
@@ -190,21 +190,21 @@ export default function Header({
                 triggerHaptic(20);
                 onOpenSettings();
               }}
-              className="p-2 rounded-xl bg-emerald-900/70 border border-emerald-400/30 text-emerald-100 hover:bg-emerald-900 transition-colors"
+              className="p-1.5 sm:p-2 rounded-xl bg-emerald-900/70 border border-emerald-400/30 text-emerald-100 hover:bg-emerald-900 transition-colors shrink-0"
               title="Pengaturan Data & Ekspor/Impor"
               aria-label="Pengaturan"
             >
-              <Settings className="w-4 h-4" />
+              <Settings className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </button>
 
             {/* Tombol Pasang PWA */}
             <button
               onClick={handleInstallClick}
-              className="p-2 rounded-xl bg-white text-emerald-800 hover:bg-emerald-50 active:bg-emerald-100 transition-colors shadow-xs"
+              className="p-1.5 sm:p-2 rounded-xl bg-emerald-900/70 border border-emerald-400/30 text-emerald-100 hover:bg-emerald-900 hover:text-white transition-colors shrink-0"
               title="Pasang aplikasi di layar utama HP"
               aria-label="Pasang Aplikasi"
             >
-              <Download className="w-4 h-4" />
+              <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </button>
           </div>
         </div>
