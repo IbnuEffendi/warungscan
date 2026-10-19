@@ -143,13 +143,18 @@ export default function FinanceView({
   const [newWalletName, setNewWalletName] = useState('');
   const [newWalletType, setNewWalletType] = useState<Wallet['type']>('cash_pribadi');
   const [newWalletBalance, setNewWalletBalance] = useState<number>(0);
+  const [newWalletScope, setNewWalletScope] = useState<'pribadi' | 'bersama'>('pribadi');
 
   // Form Edit Dompet
   const [editingWallet, setEditingWallet] = useState<Wallet | null>(null);
   const [editWalletName, setEditWalletName] = useState('');
   const [editWalletType, setEditWalletType] = useState<Wallet['type']>('cash_pribadi');
   const [editWalletBalance, setEditWalletBalance] = useState<number>(0);
+  const [editWalletScope, setEditWalletScope] = useState<'pribadi' | 'bersama'>('pribadi');
   const [editWalletRecordHistory, setEditWalletRecordHistory] = useState(true);
+
+  // Filter Tampilan Tab Dompet: 'pribadi' | 'bersama' | 'all'
+  const [walletFilterTab, setWalletFilterTab] = useState<'pribadi' | 'bersama' | 'all'>('pribadi');
 
   // Form Transfer Dompet
   const [transferFromId, setTransferFromId] = useState('');
@@ -323,32 +328,32 @@ export default function FinanceView({
     loadLocalUserData();
   }, [loadLocalUserData]);
 
-  // 1. ISOLASI DOMPET
+  // 1. ISOLASI DOMPET (PRIBADI VS BERSAMA/TOKO)
   const visibleWallets = useMemo(() => {
     return wallets.filter((w) => {
-      if (w.type === 'cash_warung') return true;
+      // Dompet bersama dapat dilihat semua akun, dompet pribadi hanya pemiliknya
+      if (!w.is_private || w.type === 'cash_warung') return true;
       if (currentMember.role === 'super_admin' && showAllUsersData) return true;
       return w.user_id === activeUserId || w.user_id === currentMember.id;
     });
   }, [wallets, currentMember, showAllUsersData, activeUserId]);
 
-  useEffect(() => {
-    if (!txWalletId && visibleWallets.length > 0) {
-      setTxWalletId(visibleWallets[0].id);
-    }
-    if (!transferFromId && visibleWallets.length > 0) {
-      setTransferFromId(visibleWallets[0].id);
-    }
-    if (!transferToId && visibleWallets.length > 1) {
-      setTransferToId(visibleWallets[1].id);
-    }
-    if (!depositWalletId && visibleWallets.length > 0) {
-      setDepositWalletId(visibleWallets[0].id);
-    }
-    if (!saleDestWalletId && visibleWallets.length > 0) {
-      setSaleDestWalletId(visibleWallets[0].id);
-    }
-  }, [visibleWallets, txWalletId, transferFromId, transferToId, depositWalletId, saleDestWalletId]);
+  // Pemisahan Dompet Pribadi vs Dompet Bersama / Toko
+  const personalWallets = useMemo(() => {
+    return visibleWallets.filter((w) => w.is_private && w.type !== 'cash_warung');
+  }, [visibleWallets]);
+
+  const sharedWallets = useMemo(() => {
+    return visibleWallets.filter((w) => !w.is_private || w.type === 'cash_warung');
+  }, [visibleWallets]);
+
+  const personalTotal = useMemo(() => {
+    return personalWallets.reduce((sum, w) => sum + Number(w.balance || 0), 0);
+  }, [personalWallets]);
+
+  const sharedTotal = useMemo(() => {
+    return sharedWallets.reduce((sum, w) => sum + Number(w.balance || 0), 0);
+  }, [sharedWallets]);
 
   const totalBalance = useMemo(() => {
     return visibleWallets.reduce((sum, w) => sum + Number(w.balance || 0), 0);
@@ -662,13 +667,16 @@ export default function FinanceView({
     if (!newWalletName.trim()) return;
 
     triggerHaptic(30);
+    const isShared = newWalletScope === 'bersama';
+    const computedType = isShared && newWalletType === 'cash_pribadi' ? 'cash_warung' : newWalletType;
+
     const newW: Wallet = {
       id: generateUUID(),
       user_id: activeUserId,
       name: newWalletName.trim(),
-      type: newWalletType,
+      type: computedType,
       balance: newWalletBalance,
-      is_private: true,
+      is_private: !isShared,
     };
 
     // Optimistic Update LocalStorage
@@ -684,7 +692,8 @@ export default function FinanceView({
       setIsAddingWallet(false);
       setNewWalletName('');
       setNewWalletBalance(0);
-      alert(`Dompet "${newW.name}" berhasil dibuat.`);
+      setNewWalletScope('pribadi');
+      alert(`Dompet "${newW.name}" berhasil dibuat (${isShared ? 'Aset Toko / Bersama' : 'Aset Pribadi'}).`);
     } catch (err: any) {
       onRefreshFinance();
       setIsAddingWallet(false);
@@ -698,6 +707,7 @@ export default function FinanceView({
     setEditWalletName(wallet.name);
     setEditWalletType(wallet.type);
     setEditWalletBalance(Number(wallet.balance) || 0);
+    setEditWalletScope(wallet.is_private && wallet.type !== 'cash_warung' ? 'pribadi' : 'bersama');
     setEditWalletRecordHistory(true);
   };
 
@@ -710,12 +720,15 @@ export default function FinanceView({
     const oldBalance = Number(editingWallet.balance) || 0;
     const newBalance = Number(editWalletBalance) || 0;
     const balanceDiff = newBalance - oldBalance;
+    const isShared = editWalletScope === 'bersama';
+    const computedType = isShared && editWalletType === 'cash_pribadi' ? 'cash_warung' : editWalletType;
 
     const updatedWallet: Wallet = {
       ...editingWallet,
       name: editWalletName.trim(),
-      type: editWalletType,
+      type: computedType,
       balance: newBalance,
+      is_private: !isShared,
     };
 
     // Optimistic Update LocalStorage
@@ -735,8 +748,8 @@ export default function FinanceView({
         amount: Math.abs(balanceDiff),
         category: isGain ? 'Gaji & Hasil Usaha' : 'Lain-lain',
         description: `Penyesuaian saldo dompet "${updatedWallet.name}" (${isGain ? '+' : '-'}${formatRupiah(Math.abs(balanceDiff))})`,
-        source_type: 'pribadi',
-        is_private: true,
+        source_type: isShared ? 'warung' : 'pribadi',
+        is_private: !isShared,
         created_at: new Date().toISOString(),
       };
 
@@ -763,6 +776,7 @@ export default function FinanceView({
             name: updatedWallet.name,
             type: updatedWallet.type,
             balance: updatedWallet.balance,
+            is_private: updatedWallet.is_private,
           })
           .eq('id', updatedWallet.id);
       }
@@ -778,7 +792,8 @@ export default function FinanceView({
   // HAPUS DOMPET
   const handleDeleteWallet = async (walletToDelete: Wallet) => {
     triggerHaptic(30);
-    const confirmText = `Apakah Anda yakin ingin menghapus dompet "${walletToDelete.name}"?\nSaldo saat ini: ${formatRupiah(walletToDelete.balance)}`;
+    const isShared = !walletToDelete.is_private || walletToDelete.type === 'cash_warung';
+    const confirmText = `Apakah Anda yakin ingin menghapus ${isShared ? 'dompet bersama / toko' : 'dompet pribadi'} "${walletToDelete.name}"?\nSaldo saat ini: ${formatRupiah(walletToDelete.balance)}`;
     if (!window.confirm(confirmText)) return;
 
     triggerHaptic(40);
@@ -1453,11 +1468,29 @@ export default function FinanceView({
           )}
         </div>
 
-        <div className="mt-1 flex items-baseline justify-between">
-          <h2 className="text-2xl font-black tracking-tight">{formatRupiah(totalBalance)}</h2>
-          <span className="text-[10px] bg-slate-950/15 font-bold px-2 py-0.5 rounded-full">
-            {visibleWallets.length} Dompet
-          </span>
+        <div className="mt-1 space-y-1.5">
+          <div className="flex items-baseline justify-between">
+            <div>
+              <span className="text-[10px] font-black text-amber-950 uppercase block tracking-wider">
+                Aset Pribadi Saya:
+              </span>
+              <h2 className="text-2xl font-black tracking-tight text-slate-950">
+                {formatRupiah(personalTotal)}
+              </h2>
+            </div>
+            <span className="text-[10px] bg-slate-950/15 font-bold px-2 py-0.5 rounded-full">
+              {personalWallets.length} Dompet Pribadi
+            </span>
+          </div>
+
+          {sharedWallets.length > 0 && (
+            <div className="flex items-center justify-between pt-1 border-t border-amber-600/20 text-xs">
+              <span className="text-[10px] font-bold text-amber-950">Aset Toko & Bersama:</span>
+              <span className="font-extrabold text-slate-900">
+                {formatRupiah(sharedTotal)} ({sharedWallets.length} Dompet)
+              </span>
+            </div>
+          )}
         </div>
 
         {/* QUICK BUTTONS */}
@@ -1957,101 +1990,304 @@ export default function FinanceView({
         </div>
       )}
 
-      {/* 2. KONTEN SUB-TAB: DOMPET & REKENING */}
+      {/* 2. KONTEN SUB-TAB: DOMPET & REKENING (PISAH ASET PRIBADI VS BERSAMA/TOKO) */}
       {subTab === 'wallets' && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-black text-slate-800 uppercase">Daftar Dompet & Akun</h3>
-            <div className="flex space-x-1.5">
+        <div className="space-y-3.5">
+          {/* HEADER & ACTION BUTTONS */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
+            <div>
+              <h3 className="text-xs font-black text-slate-800 uppercase tracking-wide">
+                Daftar Dompet & Akun
+              </h3>
+              <p className="text-[11px] text-slate-500 font-medium">
+                Pemisahan terstruktur aset pribadi dan kas bersama / toko
+              </p>
+            </div>
+            <div className="flex items-center space-x-2">
               <button
+                type="button"
                 onClick={() => {
                   triggerHaptic(20);
                   setIsTransferModalOpen(true);
                 }}
-                className="px-2.5 py-1.5 rounded-xl bg-slate-200 text-slate-800 font-bold text-xs flex items-center space-x-1"
+                className="px-3 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs flex items-center space-x-1.5 transition-colors"
+                style={{ minHeight: '44px' }}
               >
                 <ArrowRightLeft className="w-3.5 h-3.5" />
                 <span>Pindah Saldo</span>
               </button>
 
               <button
+                type="button"
                 onClick={() => {
                   triggerHaptic(20);
+                  setNewWalletScope(walletFilterTab === 'bersama' ? 'bersama' : 'pribadi');
                   setIsAddingWallet(true);
                 }}
-                className="px-2.5 py-1.5 rounded-xl bg-amber-500 text-slate-950 font-bold text-xs flex items-center space-x-1"
+                className="px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs flex items-center space-x-1.5 shadow-xs transition-colors"
+                style={{ minHeight: '44px' }}
               >
-                <Plus className="w-3.5 h-3.5" />
+                <Plus className="w-4 h-4" />
                 <span>Tambah Dompet</span>
               </button>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-2">
-            {visibleWallets.map((wallet) => (
-              <div
-                key={wallet.id}
-                className="p-3.5 bg-white rounded-2xl border border-slate-200 flex items-center justify-between shadow-2xs"
+          {/* FILTER TAB PILLS (ASET PRIBADI / BERSAMA & TOKO / SEMUA) */}
+          <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-100 rounded-2xl border border-slate-200">
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic(15);
+                setWalletFilterTab('pribadi');
+              }}
+              className={`py-2 px-2 rounded-xl text-xs font-black text-center transition-all flex flex-col sm:flex-row items-center justify-center gap-1 ${
+                walletFilterTab === 'pribadi'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+              style={{ minHeight: '44px' }}
+            >
+              <span>Aset Pribadi</span>
+              <span
+                className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                  walletFilterTab === 'pribadi'
+                    ? 'bg-amber-100 text-amber-900'
+                    : 'bg-slate-200 text-slate-600'
+                }`}
               >
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-900 flex items-center justify-center shrink-0">
-                    {wallet.type === 'cash_warung' ? (
-                      <Banknote className="w-5 h-5 text-emerald-700" />
-                    ) : wallet.type === 'bank' ? (
-                      <Building className="w-5 h-5 text-blue-700" />
-                    ) : wallet.type === 'ewallet' ? (
-                      <CreditCard className="w-5 h-5 text-purple-700" />
-                    ) : (
-                      <WalletIcon className="w-5 h-5 text-amber-700" />
-                    )}
+                {personalWallets.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic(15);
+                setWalletFilterTab('bersama');
+              }}
+              className={`py-2 px-2 rounded-xl text-xs font-black text-center transition-all flex flex-col sm:flex-row items-center justify-center gap-1 ${
+                walletFilterTab === 'bersama'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+              style={{ minHeight: '44px' }}
+            >
+              <span>Aset Toko / Bersama</span>
+              <span
+                className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                  walletFilterTab === 'bersama'
+                    ? 'bg-emerald-100 text-emerald-900'
+                    : 'bg-slate-200 text-slate-600'
+                }`}
+              >
+                {sharedWallets.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic(15);
+                setWalletFilterTab('all');
+              }}
+              className={`py-2 px-2 rounded-xl text-xs font-black text-center transition-all flex flex-col sm:flex-row items-center justify-center gap-1 ${
+                walletFilterTab === 'all'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+              style={{ minHeight: '44px' }}
+            >
+              <span>Semua</span>
+              <span
+                className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                  walletFilterTab === 'all'
+                    ? 'bg-slate-200 text-slate-900'
+                    : 'bg-slate-200 text-slate-600'
+                }`}
+              >
+                {visibleWallets.length}
+              </span>
+            </button>
+          </div>
+
+          {/* BANNER TOTAL SALDO SESUAI TAB */}
+          <div
+            className={`p-3.5 rounded-2xl border flex items-center justify-between ${
+              walletFilterTab === 'pribadi'
+                ? 'bg-amber-50/70 border-amber-200/80 text-amber-950'
+                : walletFilterTab === 'bersama'
+                ? 'bg-emerald-50/70 border-emerald-200/80 text-emerald-950'
+                : 'bg-slate-50 border-slate-200 text-slate-900'
+            }`}
+          >
+            <div>
+              <span className="text-[11px] font-bold block opacity-75">
+                {walletFilterTab === 'pribadi'
+                  ? 'Total Saldo Aset Pribadi'
+                  : walletFilterTab === 'bersama'
+                  ? 'Total Saldo Aset Toko / Bersama'
+                  : 'Total Keseluruhan Saldo'}
+              </span>
+              <span className="text-lg font-black block tracking-tight">
+                {formatRupiah(
+                  walletFilterTab === 'pribadi'
+                    ? personalTotal
+                    : walletFilterTab === 'bersama'
+                    ? sharedTotal
+                    : totalBalance
+                )}
+              </span>
+            </div>
+            <div className="text-right">
+              <span className="text-[10px] font-semibold px-2 py-1 rounded-lg bg-white/80 border border-black/5 block">
+                {walletFilterTab === 'pribadi'
+                  ? 'Privat (Hanya Anda)'
+                  : walletFilterTab === 'bersama'
+                  ? 'Bersama Seluruh Kasir'
+                  : 'Total Komprehensif'}
+              </span>
+            </div>
+          </div>
+
+          {/* DAFTAR KARTU DOMPET SESUAI FILTER */}
+          {(() => {
+            const listToRender =
+              walletFilterTab === 'pribadi'
+                ? personalWallets
+                : walletFilterTab === 'bersama'
+                ? sharedWallets
+                : visibleWallets;
+
+            if (listToRender.length === 0) {
+              return (
+                <div className="p-8 text-center bg-white rounded-3xl border border-dashed border-slate-200 space-y-3">
+                  <div className="w-12 h-12 mx-auto rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center">
+                    <WalletIcon className="w-6 h-6" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-extrabold text-slate-900">{wallet.name}</h4>
-                    <span className="text-[10px] text-slate-500 font-medium">
-                      {wallet.type === 'cash_warung'
-                        ? 'Laci Toko Bersama'
-                        : wallet.type === 'bank'
-                        ? 'Rekening Bank'
-                        : wallet.type === 'ewallet'
-                        ? 'E-Wallet'
-                        : 'Dompet Tunai Pribadi'}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-2 sm:space-x-3">
-                  <div className="text-right">
-                    <p className="text-sm font-black text-slate-900">
-                      {formatRupiah(wallet.balance)}
+                    <h4 className="text-sm font-black text-slate-800">
+                      {walletFilterTab === 'bersama'
+                        ? 'Tidak ada dompet bersama / toko'
+                        : 'Belum ada dompet di kategori ini'}
+                    </h4>
+                    <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                      {walletFilterTab === 'bersama'
+                        ? 'Dompet laci warung dapat dihapus jika tidak dipakai, atau Anda dapat menambahkan dompet bersama baru kapan pun.'
+                        : 'Mulai kelola keuangan Anda dengan membuat dompet atau rekening baru.'}
                     </p>
                   </div>
-
-                  <div className="flex items-center space-x-1 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => handleOpenEditWallet(wallet)}
-                      className="p-2 rounded-xl text-slate-500 hover:text-amber-700 hover:bg-amber-50 active:scale-95 transition-all"
-                      title="Ubah Dompet"
-                      aria-label="Ubah Dompet"
-                      style={{ minWidth: '40px', minHeight: '40px' }}
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteWallet(wallet)}
-                      className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 active:scale-95 transition-all"
-                      title="Hapus Dompet"
-                      aria-label="Hapus Dompet"
-                      style={{ minWidth: '40px', minHeight: '40px' }}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      triggerHaptic(20);
+                      setNewWalletScope(walletFilterTab === 'bersama' ? 'bersama' : 'pribadi');
+                      setIsAddingWallet(true);
+                    }}
+                    className="px-4 py-2.5 rounded-xl bg-amber-500 text-slate-950 font-bold text-xs inline-flex items-center space-x-1.5 shadow-xs"
+                    style={{ minHeight: '44px' }}
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>
+                      {walletFilterTab === 'bersama'
+                        ? 'Tambah Dompet Bersama/Toko'
+                        : 'Tambah Dompet Baru'}
+                    </span>
+                  </button>
                 </div>
+              );
+            }
+
+            return (
+              <div className="grid grid-cols-1 gap-2.5">
+                {listToRender.map((wallet) => {
+                  const isWalletShared = !wallet.is_private || wallet.type === 'cash_warung';
+                  return (
+                    <div
+                      key={wallet.id}
+                      className="p-3.5 bg-white rounded-2xl border border-slate-200 flex items-center justify-between shadow-2xs hover:border-slate-300 transition-all"
+                    >
+                      <div className="flex items-center space-x-3 min-w-0">
+                        <div
+                          className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 ${
+                            isWalletShared
+                              ? 'bg-emerald-100 text-emerald-900'
+                              : 'bg-amber-100 text-amber-900'
+                          }`}
+                        >
+                          {wallet.type === 'cash_warung' ? (
+                            <Banknote className="w-5 h-5 text-emerald-700" />
+                          ) : wallet.type === 'bank' ? (
+                            <Building className="w-5 h-5 text-blue-700" />
+                          ) : wallet.type === 'ewallet' ? (
+                            <CreditCard className="w-5 h-5 text-purple-700" />
+                          ) : (
+                            <WalletIcon className="w-5 h-5 text-amber-700" />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center space-x-2">
+                            <h4 className="text-xs font-extrabold text-slate-900 truncate">
+                              {wallet.name}
+                            </h4>
+                            <span
+                              className={`text-[9px] font-black px-1.5 py-0.5 rounded-md ${
+                                isWalletShared
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : 'bg-slate-100 text-slate-700'
+                              }`}
+                            >
+                              {isWalletShared ? 'Aset Bersama / Toko' : 'Aset Pribadi'}
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-slate-500 font-medium block truncate mt-0.5">
+                            {wallet.type === 'cash_warung'
+                              ? 'Laci Toko Bersama'
+                              : wallet.type === 'bank'
+                              ? 'Rekening Bank'
+                              : wallet.type === 'ewallet'
+                              ? 'E-Wallet'
+                              : 'Dompet Tunai Pribadi'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center space-x-2 shrink-0">
+                        <div className="text-right mr-1">
+                          <p className="text-sm font-black text-slate-900">
+                            {formatRupiah(wallet.balance)}
+                          </p>
+                        </div>
+
+                        <div className="flex items-center space-x-1">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditWallet(wallet)}
+                            className="p-2.5 rounded-xl text-slate-500 hover:text-amber-700 hover:bg-amber-50 active:scale-95 transition-all"
+                            title="Ubah Dompet"
+                            aria-label="Ubah Dompet"
+                            style={{ minWidth: '44px', minHeight: '44px' }}
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteWallet(wallet)}
+                            className="p-2.5 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 active:scale-95 transition-all"
+                            title="Hapus Dompet"
+                            aria-label="Hapus Dompet"
+                            style={{ minWidth: '44px', minHeight: '44px' }}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            ))}
-          </div>
+            );
+          })()}
         </div>
       )}
 
@@ -2903,27 +3139,79 @@ export default function FinanceView({
       {/* MODAL 3: TAMBAH DOMPET BARU */}
       {isAddingWallet && (
         <div className="fixed inset-0 z-50 bg-black/75 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in">
-          <div className="bg-white rounded-t-3xl sm:rounded-3xl max-w-sm w-full p-5 space-y-3">
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl max-w-sm w-full p-5 space-y-3.5 shadow-2xl">
             <div className="flex items-center justify-between pb-2 border-b border-slate-200">
               <h3 className="font-black text-slate-900 text-sm">Tambah Dompet / Rekening</h3>
               <button
+                type="button"
                 onClick={() => setIsAddingWallet(false)}
-                className="p-1 rounded-lg text-slate-400"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700"
+                style={{ minWidth: '44px', minHeight: '44px' }}
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <form onSubmit={handleCreateWallet} className="space-y-3 text-xs">
+              {/* PILIHAN KATEGORI KEPEMILIKAN */}
+              <div>
+                <label className="block font-bold text-slate-700 mb-1.5">
+                  Kategori Kepemilikan Aset
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      triggerHaptic(15);
+                      setNewWalletScope('pribadi');
+                    }}
+                    className={`p-2.5 rounded-xl border text-left transition-all ${
+                      newWalletScope === 'pribadi'
+                        ? 'border-amber-500 bg-amber-50/80 text-amber-950 font-black'
+                        : 'border-slate-200 bg-white text-slate-600 font-semibold hover:border-slate-300'
+                    }`}
+                    style={{ minHeight: '44px' }}
+                  >
+                    <span className="block text-xs">Aset Pribadi</span>
+                    <span className="text-[10px] opacity-75 font-normal block">
+                      Hanya akun Anda
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      triggerHaptic(15);
+                      setNewWalletScope('bersama');
+                    }}
+                    className={`p-2.5 rounded-xl border text-left transition-all ${
+                      newWalletScope === 'bersama'
+                        ? 'border-emerald-500 bg-emerald-50/80 text-emerald-950 font-black'
+                        : 'border-slate-200 bg-white text-slate-600 font-semibold hover:border-slate-300'
+                    }`}
+                    style={{ minHeight: '44px' }}
+                  >
+                    <span className="block text-xs">Aset Toko / Bersama</span>
+                    <span className="text-[10px] opacity-75 font-normal block">
+                      Kas toko & keluarga
+                    </span>
+                  </button>
+                </div>
+              </div>
+
               <div>
                 <label className="block font-bold text-slate-700 mb-1">Nama Dompet / Rekening</label>
                 <input
                   type="text"
                   required
-                  placeholder="Contoh: Tabungan BRI, Dompet Dapur..."
+                  placeholder={
+                    newWalletScope === 'bersama'
+                      ? 'Contoh: Laci Kasir Warung, Kas Operasional Toko'
+                      : 'Contoh: Tabungan BRI, Uang Saku, Dompet Harian'
+                  }
                   value={newWalletName}
                   onChange={(e) => setNewWalletName(e.target.value)}
-                  className="w-full p-2.5 rounded-xl border border-slate-300 font-bold bg-white"
+                  className="w-full p-2.5 rounded-xl border border-slate-300 font-bold bg-white text-slate-900"
                 />
               </div>
 
@@ -2932,9 +3220,11 @@ export default function FinanceView({
                 <select
                   value={newWalletType}
                   onChange={(e) => setNewWalletType(e.target.value as any)}
-                  className="w-full p-2.5 rounded-xl border border-slate-300 font-bold bg-white"
+                  className="w-full p-2.5 rounded-xl border border-slate-300 font-bold bg-white text-slate-900"
                 >
-                  <option value="cash_pribadi">Uang Tunai Pribadi</option>
+                  <option value="cash_pribadi">
+                    {newWalletScope === 'bersama' ? 'Uang Tunai Kasir / Toko' : 'Uang Tunai Pribadi'}
+                  </option>
                   <option value="bank">Rekening Bank (BCA, BRI, Mandiri, dll)</option>
                   <option value="ewallet">E-Wallet (Dana, OVO, Gopay, ShopeePay)</option>
                 </select>
@@ -2947,13 +3237,13 @@ export default function FinanceView({
                   value={newWalletBalance || ''}
                   onChange={(e) => setNewWalletBalance(Number(e.target.value))}
                   placeholder="0"
-                  className="w-full p-2.5 rounded-xl border border-slate-300 font-bold bg-white"
+                  className="w-full p-2.5 rounded-xl border border-slate-300 font-bold bg-white text-slate-900"
                 />
               </div>
 
               <button
                 type="submit"
-                className="w-full py-3 rounded-xl bg-amber-500 font-black text-slate-950 text-xs"
+                className="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-600 font-black text-slate-950 text-xs shadow-xs"
                 style={{ minHeight: '44px' }}
               >
                 Simpan Dompet
@@ -2963,7 +3253,7 @@ export default function FinanceView({
         </div>
       )}
 
-      {/* MODAL EDIT DOMPET (DENGAN OPSI PILIH CATAT KE HISTORY) */}
+      {/* MODAL EDIT DOMPET (DENGAN OPSI PILIH CATAT KE HISTORY & KATEGORI KEPEMILIKAN) */}
       {editingWallet && (
         <div className="fixed inset-0 z-50 bg-black/75 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in">
           <div className="bg-white rounded-t-3xl sm:rounded-3xl max-w-sm w-full p-5 space-y-3.5 shadow-2xl">
@@ -2978,12 +3268,59 @@ export default function FinanceView({
                 type="button"
                 onClick={() => setEditingWallet(null)}
                 className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700"
+                style={{ minWidth: '44px', minHeight: '44px' }}
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <form onSubmit={handleSaveEditWallet} className="space-y-3 text-xs">
+              {/* PILIHAN KATEGORI KEPEMILIKAN */}
+              <div>
+                <label className="block font-bold text-slate-700 mb-1.5">
+                  Kategori Kepemilikan Aset
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      triggerHaptic(15);
+                      setEditWalletScope('pribadi');
+                    }}
+                    className={`p-2.5 rounded-xl border text-left transition-all ${
+                      editWalletScope === 'pribadi'
+                        ? 'border-amber-500 bg-amber-50/80 text-amber-950 font-black'
+                        : 'border-slate-200 bg-white text-slate-600 font-semibold hover:border-slate-300'
+                    }`}
+                    style={{ minHeight: '44px' }}
+                  >
+                    <span className="block text-xs">Aset Pribadi</span>
+                    <span className="text-[10px] opacity-75 font-normal block">
+                      Hanya akun Anda
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      triggerHaptic(15);
+                      setEditWalletScope('bersama');
+                    }}
+                    className={`p-2.5 rounded-xl border text-left transition-all ${
+                      editWalletScope === 'bersama'
+                        ? 'border-emerald-500 bg-emerald-50/80 text-emerald-950 font-black'
+                        : 'border-slate-200 bg-white text-slate-600 font-semibold hover:border-slate-300'
+                    }`}
+                    style={{ minHeight: '44px' }}
+                  >
+                    <span className="block text-xs">Aset Toko / Bersama</span>
+                    <span className="text-[10px] opacity-75 font-normal block">
+                      Kas toko & keluarga
+                    </span>
+                  </button>
+                </div>
+              </div>
+
               <div>
                 <label className="block font-bold text-slate-700 mb-1">Nama Dompet / Rekening</label>
                 <input
@@ -3002,7 +3339,9 @@ export default function FinanceView({
                   onChange={(e) => setEditWalletType(e.target.value as any)}
                   className="w-full p-2.5 rounded-xl border border-slate-300 font-bold bg-white text-slate-900"
                 >
-                  <option value="cash_pribadi">Uang Tunai Pribadi</option>
+                  <option value="cash_pribadi">
+                    {editWalletScope === 'bersama' ? 'Uang Tunai Kasir / Toko' : 'Uang Tunai Pribadi'}
+                  </option>
                   <option value="bank">Rekening Bank (BCA, BRI, Mandiri, dll)</option>
                   <option value="ewallet">E-Wallet (Dana, OVO, Gopay, ShopeePay)</option>
                   <option value="cash_warung">Laci Toko Bersama</option>
@@ -3053,7 +3392,7 @@ export default function FinanceView({
                 <button
                   type="button"
                   onClick={() => setEditingWallet(null)}
-                  className="px-3 py-3 rounded-xl bg-slate-200 text-slate-700 font-bold text-xs"
+                  className="px-3 py-3 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs"
                   style={{ minHeight: '44px' }}
                 >
                   Batal

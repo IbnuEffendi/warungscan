@@ -53,8 +53,7 @@ const DEFAULT_FAMILY_MEMBERS: FamilyMember[] = [
 ];
 
 const DEFAULT_WALLETS: Wallet[] = [
-  { id: '00000000-0000-0000-0000-000000000011', user_id: DEFAULT_USER_ID, name: 'Laci Kasir Warung', type: 'cash_warung', balance: 500000, is_private: false },
-  { id: '00000000-0000-0000-0000-000000000012', user_id: DEFAULT_USER_ID, name: 'Dompet Pribadi', type: 'cash_pribadi', balance: 250000, is_private: true },
+  { id: '00000000-0000-0000-0000-000000000012', user_id: DEFAULT_USER_ID, name: 'Dompet Pribadi', type: 'cash_pribadi', balance: 0, is_private: true },
 ];
 
 export default function Home() {
