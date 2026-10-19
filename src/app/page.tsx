@@ -182,28 +182,19 @@ export default function Home() {
     try {
       const savedUserId = localStorage.getItem('warungscan_active_user_id');
 
-      if (isDbConnected) {
-        const { data: famData } = await supabase.from('family_members').select('*');
-        if (famData && famData.length > 0) {
-          setFamilyMembers(famData);
-          if (savedUserId) {
-            const matched = famData.find((m) => m.id === savedUserId);
-            if (matched) setCurrentMember(matched);
-            else setCurrentMember(famData[0]);
-          } else {
-            // Perangkat Baru! Kunci layar untuk memilih akun
-            setIsGateUnlocked(false);
-          }
+      // 1. Selalu muat akun keluarga langsung dari Supabase
+      const { data: famData, error: famErr } = await supabase.from('family_members').select('*');
+      if (!famErr && famData && famData.length > 0) {
+        setFamilyMembers(famData);
+        localStorage.setItem('warungscan_family', JSON.stringify(famData));
+        if (savedUserId) {
+          const matched = famData.find((m) => m.id === savedUserId);
+          if (matched) setCurrentMember(matched);
+          else setCurrentMember(famData[0]);
+        } else {
+          // Perangkat Baru! Kunci layar untuk memilih akun
+          setIsGateUnlocked(false);
         }
-
-        const { data: walData } = await supabase.from('wallets').select('*');
-        if (walData && walData.length > 0) setWallets(walData);
-
-        const { data: expData } = await supabase
-          .from('personal_expenses')
-          .select('*')
-          .order('created_at', { ascending: false });
-        if (expData) setPersonalExpenses(expData);
       } else {
         const localFam = localStorage.getItem('warungscan_family');
         if (localFam) {
@@ -219,17 +210,34 @@ export default function Home() {
             }
           }
         }
+      }
 
+      // 2. Muat data dompet dari Supabase atau lokal
+      const { data: walData, error: walErr } = await supabase.from('wallets').select('*');
+      if (!walErr && walData && walData.length > 0) {
+        setWallets(walData);
+        localStorage.setItem('warungscan_wallets', JSON.stringify(walData));
+      } else {
         const localWallets = localStorage.getItem('warungscan_wallets');
         if (localWallets) setWallets(JSON.parse(localWallets));
+      }
 
+      // 3. Muat catatan pengeluaran & pemasukan pribadi
+      const { data: expData, error: expErr } = await supabase
+        .from('personal_expenses')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (!expErr && expData) {
+        setPersonalExpenses(expData);
+        localStorage.setItem('warungscan_personal_expenses', JSON.stringify(expData));
+      } else {
         const localExp = localStorage.getItem('warungscan_personal_expenses');
         if (localExp) setPersonalExpenses(JSON.parse(localExp));
       }
     } catch (err) {
       console.warn('Finance data load notice:', err);
     }
-  }, [isDbConnected]);
+  }, []);
 
   useEffect(() => {
     loadProducts();

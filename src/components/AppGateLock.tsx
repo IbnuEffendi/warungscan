@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { FamilyMember } from '@/types';
 import { triggerHaptic } from '@/lib/utils';
+import { supabase } from '@/lib/supabase';
 
 interface AppGateLockProps {
   currentMember: FamilyMember | null;
@@ -35,30 +36,78 @@ export default function AppGateLock({
     currentMember ? 'enter_pin' : 'select_account'
   );
 
+  const [liveMembers, setLiveMembers] = useState<FamilyMember[]>(familyMembers);
   const [pin, setPin] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [rememberDevice, setRememberDevice] = useState(true);
 
-  // Sinkronisasi target awal jika currentMember berubah atau list dimuat
+  // Ambil data anggota dan PIN paling fresh langsung dari Supabase saat AppGateLock dibuka
   useEffect(() => {
-    if (!selectedTarget && currentMember) {
-      setSelectedTarget(currentMember);
-      setViewMode('enter_pin');
+    let isMounted = true;
+    async function fetchFreshMembers() {
+      try {
+        const { data, error } = await supabase.from('family_members').select('*');
+        if (!error && data && data.length > 0 && isMounted) {
+          setLiveMembers(data);
+          localStorage.setItem('warungscan_family', JSON.stringify(data));
+          if (selectedTarget) {
+            const matched = data.find((m) => m.id === selectedTarget.id);
+            if (matched) setSelectedTarget(matched);
+          } else if (currentMember) {
+            const matched = data.find((m) => m.id === currentMember.id);
+            if (matched) setSelectedTarget(matched);
+          }
+        }
+      } catch (err) {
+        console.warn('AppGateLock Supabase fetch error:', err);
+      }
     }
-  }, [currentMember, selectedTarget]);
+    fetchFreshMembers();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Sinkronisasi target jika familyMembers prop dari parent berubah
+  useEffect(() => {
+    if (familyMembers.length > 0) {
+      setLiveMembers(familyMembers);
+      if (selectedTarget) {
+        const matched = familyMembers.find((m) => m.id === selectedTarget.id);
+        if (matched) setSelectedTarget(matched);
+      } else if (currentMember) {
+        const matched = familyMembers.find((m) => m.id === currentMember.id) || currentMember;
+        setSelectedTarget(matched);
+      }
+    }
+  }, [familyMembers, currentMember]);
 
   // Tombol Keypad
-  const handleKeypadPress = (val: string) => {
+  const handleKeypadPress = async (val: string) => {
     triggerHaptic(15);
     if (pin.length < 6) {
       const nextPin = pin + val;
       setPin(nextPin);
       setErrorMsg('');
 
-      // Auto-submit jika sudah 4 digit dan cocok
-      if (selectedTarget) {
-        const expectedPin = selectedTarget.pin || '1234';
-        if (nextPin === expectedPin || nextPin === '4477') {
+      // Auto-submit jika sudah 4 digit
+      if (selectedTarget && nextPin.length >= 4) {
+        let validPin = selectedTarget.pin;
+        try {
+          const { data: dbMember } = await supabase
+            .from('family_members')
+            .select('pin')
+            .eq('id', selectedTarget.id)
+            .maybeSingle();
+          if (dbMember?.pin) {
+            validPin = dbMember.pin;
+            selectedTarget.pin = dbMember.pin;
+          }
+        } catch {}
+
+        if (!validPin) validPin = '1234';
+
+        if (nextPin === validPin || nextPin === '4477') {
           handleSuccessUnlock(selectedTarget);
         }
       }
@@ -100,7 +149,7 @@ export default function AppGateLock({
     onUnlock(member);
   };
 
-  const handleSubmitPin = (e?: React.FormEvent) => {
+  const handleSubmitPin = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!selectedTarget) return;
 
@@ -110,10 +159,26 @@ export default function AppGateLock({
     }
 
     triggerHaptic(30);
-    const validPin = selectedTarget.pin || '1234';
+
+    // Ambil PIN paling akurat langsung dari Supabase
+    let validPin = selectedTarget.pin;
+    try {
+      const { data: dbMember } = await supabase
+        .from('family_members')
+        .select('pin')
+        .eq('id', selectedTarget.id)
+        .maybeSingle();
+
+      if (dbMember?.pin) {
+        validPin = dbMember.pin;
+        selectedTarget.pin = dbMember.pin;
+      }
+    } catch {}
+
+    if (!validPin) validPin = '1234';
 
     // Verifikasi dengan PIN akun dari database atau kode master pemilik (4477)
-    if (pin === validPin || pin === '4477') {
+    if (pin.trim() === validPin.trim() || pin.trim() === '4477') {
       handleSuccessUnlock(selectedTarget);
     } else {
       triggerHaptic(60);
@@ -124,8 +189,8 @@ export default function AppGateLock({
 
   // Pastikan ada anggota yang dapat dipilih (fallback jika list masih kosong)
   const displayMembers =
-    familyMembers.length > 0
-      ? familyMembers
+    liveMembers.length > 0
+      ? liveMembers
       : [
           {
             id: '00000000-0000-0000-0000-000000000001',

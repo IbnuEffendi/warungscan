@@ -144,6 +144,13 @@ export default function FinanceView({
   const [newWalletType, setNewWalletType] = useState<Wallet['type']>('cash_pribadi');
   const [newWalletBalance, setNewWalletBalance] = useState<number>(0);
 
+  // Form Edit Dompet
+  const [editingWallet, setEditingWallet] = useState<Wallet | null>(null);
+  const [editWalletName, setEditWalletName] = useState('');
+  const [editWalletType, setEditWalletType] = useState<Wallet['type']>('cash_pribadi');
+  const [editWalletBalance, setEditWalletBalance] = useState<number>(0);
+  const [editWalletRecordHistory, setEditWalletRecordHistory] = useState(true);
+
   // Form Transfer Dompet
   const [transferFromId, setTransferFromId] = useState('');
   const [transferToId, setTransferToId] = useState('');
@@ -681,6 +688,115 @@ export default function FinanceView({
     } catch (err: any) {
       onRefreshFinance();
       setIsAddingWallet(false);
+    }
+  };
+
+  // BUKA MODAL EDIT DOMPET
+  const handleOpenEditWallet = (wallet: Wallet) => {
+    triggerHaptic(20);
+    setEditingWallet(wallet);
+    setEditWalletName(wallet.name);
+    setEditWalletType(wallet.type);
+    setEditWalletBalance(Number(wallet.balance) || 0);
+    setEditWalletRecordHistory(true);
+  };
+
+  // SIMPAN PERUBAHAN DOMPET (DENGAN OPSI PILIH CATAT KE HISTORY ATAU TIDAK)
+  const handleSaveEditWallet = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingWallet || !editWalletName.trim()) return;
+
+    triggerHaptic(30);
+    const oldBalance = Number(editingWallet.balance) || 0;
+    const newBalance = Number(editWalletBalance) || 0;
+    const balanceDiff = newBalance - oldBalance;
+
+    const updatedWallet: Wallet = {
+      ...editingWallet,
+      name: editWalletName.trim(),
+      type: editWalletType,
+      balance: newBalance,
+    };
+
+    // Optimistic Update LocalStorage
+    const localW: Wallet[] = JSON.parse(localStorage.getItem('warungscan_wallets') || '[]');
+    const updatedWallets = localW.map((w) => (w.id === updatedWallet.id ? updatedWallet : w));
+    localStorage.setItem('warungscan_wallets', JSON.stringify(updatedWallets));
+
+    // Jika user memilih untuk mencatat selisih saldo ke riwayat keuangan (History)
+    if (editWalletRecordHistory && balanceDiff !== 0) {
+      const isGain = balanceDiff > 0;
+      const historyItem: PersonalExpense = {
+        id: generateUUID(),
+        user_id: activeUserId,
+        wallet_id: updatedWallet.id,
+        wallet_name: updatedWallet.name,
+        type: isGain ? 'income' : 'expense',
+        amount: Math.abs(balanceDiff),
+        category: isGain ? 'Gaji & Hasil Usaha' : 'Lain-lain',
+        description: `Penyesuaian saldo dompet "${updatedWallet.name}" (${isGain ? '+' : '-'}${formatRupiah(Math.abs(balanceDiff))})`,
+        source_type: 'pribadi',
+        is_private: true,
+        created_at: new Date().toISOString(),
+      };
+
+      const localExp: PersonalExpense[] = JSON.parse(
+        localStorage.getItem('warungscan_personal_expenses') || '[]'
+      );
+      localExp.unshift(historyItem);
+      localStorage.setItem('warungscan_personal_expenses', JSON.stringify(localExp));
+
+      if (isDbConnected) {
+        try {
+          await supabase.from('personal_expenses').insert(historyItem);
+        } catch (err) {
+          console.warn('History insert error:', err);
+        }
+      }
+    }
+
+    try {
+      if (isDbConnected) {
+        await supabase
+          .from('wallets')
+          .update({
+            name: updatedWallet.name,
+            type: updatedWallet.type,
+            balance: updatedWallet.balance,
+          })
+          .eq('id', updatedWallet.id);
+      }
+    } catch (err: any) {
+      console.warn('Update wallet DB notice:', err);
+    }
+
+    onRefreshFinance();
+    setEditingWallet(null);
+    alert(`Dompet "${updatedWallet.name}" berhasil diperbarui.`);
+  };
+
+  // HAPUS DOMPET
+  const handleDeleteWallet = async (walletToDelete: Wallet) => {
+    triggerHaptic(30);
+    const confirmText = `Apakah Anda yakin ingin menghapus dompet "${walletToDelete.name}"?\nSaldo saat ini: ${formatRupiah(walletToDelete.balance)}`;
+    if (!window.confirm(confirmText)) return;
+
+    triggerHaptic(40);
+
+    // Optimistic delete di localStorage
+    const localW: Wallet[] = JSON.parse(localStorage.getItem('warungscan_wallets') || '[]');
+    const filteredWallets = localW.filter((w) => w.id !== walletToDelete.id);
+    localStorage.setItem('warungscan_wallets', JSON.stringify(filteredWallets));
+
+    try {
+      if (isDbConnected) {
+        await supabase.from('wallets').delete().eq('id', walletToDelete.id);
+      }
+      onRefreshFinance();
+      alert(`Dompet "${walletToDelete.name}" berhasil dihapus.`);
+    } catch (err: any) {
+      onRefreshFinance();
+      alert('Gagal menghapus dompet: ' + err.message);
     }
   };
 
@@ -1903,10 +2019,35 @@ export default function FinanceView({
                   </div>
                 </div>
 
-                <div className="text-right">
-                  <p className="text-sm font-black text-slate-900">
-                    {formatRupiah(wallet.balance)}
-                  </p>
+                <div className="flex items-center space-x-2 sm:space-x-3">
+                  <div className="text-right">
+                    <p className="text-sm font-black text-slate-900">
+                      {formatRupiah(wallet.balance)}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center space-x-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEditWallet(wallet)}
+                      className="p-2 rounded-xl text-slate-500 hover:text-amber-700 hover:bg-amber-50 active:scale-95 transition-all"
+                      title="Ubah Dompet"
+                      aria-label="Ubah Dompet"
+                      style={{ minWidth: '40px', minHeight: '40px' }}
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteWallet(wallet)}
+                      className="p-2 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 active:scale-95 transition-all"
+                      title="Hapus Dompet"
+                      aria-label="Hapus Dompet"
+                      style={{ minWidth: '40px', minHeight: '40px' }}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -2817,6 +2958,107 @@ export default function FinanceView({
               >
                 Simpan Dompet
               </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL EDIT DOMPET (DENGAN OPSI PILIH CATAT KE HISTORY) */}
+      {editingWallet && (
+        <div className="fixed inset-0 z-50 bg-black/75 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in">
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl max-w-sm w-full p-5 space-y-3.5 shadow-2xl">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+              <div className="flex items-center space-x-2">
+                <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center">
+                  <Edit2 className="w-4 h-4" />
+                </div>
+                <h3 className="font-black text-slate-900 text-sm">Ubah Dompet</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingWallet(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditWallet} className="space-y-3 text-xs">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Nama Dompet / Rekening</label>
+                <input
+                  type="text"
+                  required
+                  value={editWalletName}
+                  onChange={(e) => setEditWalletName(e.target.value)}
+                  className="w-full p-2.5 rounded-xl border border-slate-300 font-bold bg-white text-slate-900"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Jenis Akun</label>
+                <select
+                  value={editWalletType}
+                  onChange={(e) => setEditWalletType(e.target.value as any)}
+                  className="w-full p-2.5 rounded-xl border border-slate-300 font-bold bg-white text-slate-900"
+                >
+                  <option value="cash_pribadi">Uang Tunai Pribadi</option>
+                  <option value="bank">Rekening Bank (BCA, BRI, Mandiri, dll)</option>
+                  <option value="ewallet">E-Wallet (Dana, OVO, Gopay, ShopeePay)</option>
+                  <option value="cash_warung">Laci Toko Bersama</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Saldo Dompet (Rp)</label>
+                <input
+                  type="number"
+                  value={editWalletBalance}
+                  onChange={(e) => setEditWalletBalance(Number(e.target.value))}
+                  className="w-full p-2.5 rounded-xl border border-slate-300 font-extrabold text-sm bg-white text-slate-900"
+                />
+                <span className="text-[10px] text-slate-400 block mt-0.5">
+                  Saldo tercatat sebelumnya: {formatRupiah(editingWallet.balance)}
+                </span>
+              </div>
+
+              {/* OPSI PILIH MASUKKAN KE HISTORY ATAU TIDAK */}
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-1.5">
+                <label className="flex items-start space-x-2.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={editWalletRecordHistory}
+                    onChange={(e) => setEditWalletRecordHistory(e.target.checked)}
+                    className="w-4 h-4 rounded text-amber-500 focus:ring-amber-400 bg-white border-slate-300 mt-0.5"
+                  />
+                  <div>
+                    <span className="font-bold text-slate-900 block text-xs">
+                      Catat selisih saldo ke riwayat keuangan (History)?
+                    </span>
+                    <span className="text-[10px] text-slate-500 block leading-tight">
+                      Jika dicentang, selisih perubahan saldo akan otomatis dicatat sebagai transaksi penyesuaian di menu Keuangan.
+                    </span>
+                  </div>
+                </label>
+              </div>
+
+              <div className="flex space-x-2 pt-1">
+                <button
+                  type="submit"
+                  className="flex-1 py-3 rounded-xl bg-amber-500 hover:bg-amber-600 font-black text-slate-950 text-xs shadow-xs"
+                  style={{ minHeight: '44px' }}
+                >
+                  Simpan Perubahan
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingWallet(null)}
+                  className="px-3 py-3 rounded-xl bg-slate-200 text-slate-700 font-bold text-xs"
+                  style={{ minHeight: '44px' }}
+                >
+                  Batal
+                </button>
+              </div>
             </form>
           </div>
         </div>
