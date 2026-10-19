@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { Search, Plus, Edit2, Trash2, X, Check, Package, AlertTriangle, Utensils, Calculator } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, X, Check, Package, AlertTriangle, Calculator } from 'lucide-react';
 import { Product } from '@/types';
 import { formatRupiah, triggerHaptic, findBestProductMatch, generateUUID } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
@@ -11,14 +11,13 @@ interface ProductsViewProps {
   products: Product[];
   onProductsUpdate: () => void;
   isDbConnected: boolean;
-  onOpenSelfConsumption: () => void;
+  onOpenSelfConsumption?: () => void;
 }
 
 export default function ProductsView({
   products,
   onProductsUpdate,
   isDbConnected,
-  onOpenSelfConsumption,
 }: ProductsViewProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -204,29 +203,15 @@ export default function ProductsView({
           </p>
         </div>
 
-        <div className="flex items-center space-x-1.5">
-          {/* Tombol Cepat Pakai Sendiri */}
+        <div>
           <button
-            onClick={() => {
-              triggerHaptic(20);
-              onOpenSelfConsumption();
-            }}
-            className="py-2.5 px-3 rounded-xl bg-orange-100 hover:bg-orange-200 text-orange-900 font-bold text-xs flex items-center space-x-1 shadow-xs transition-colors"
-            style={{ minHeight: '44px' }}
-            title="Catat barang yang dipakai sendiri untuk masak/makan"
-          >
-            <Utensils className="w-4 h-4 text-orange-700" />
-            <span className="hidden xs:inline">Pakai Sendiri</span>
-          </button>
-
-          {/* Tombol Tambah Barang Baru */}
-          <button
+            type="button"
             onClick={openAddModal}
-            className="py-2.5 px-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs flex items-center space-x-1 shadow-xs transition-all active:scale-95"
+            className="py-2.5 px-3.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs flex items-center space-x-1.5 shadow-xs transition-all active:scale-95"
             style={{ minHeight: '44px' }}
           >
             <Plus className="w-4 h-4" />
-            <span>Tambah</span>
+            <span>Tambah Barang</span>
           </button>
         </div>
       </div>

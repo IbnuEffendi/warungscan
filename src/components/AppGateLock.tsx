@@ -257,7 +257,7 @@ export default function AppGateLock({
                           {isSuper && <Shield className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
                         </div>
                         <span className="text-[10px] text-slate-400 font-medium">
-                          {isSuper ? 'Super Admin' : 'Kasir / Pengguna'}
+                          {isSuper ? 'Super Admin' : 'Kasir'}
                         </span>
                       </div>
                     </div>
@@ -302,7 +302,7 @@ export default function AppGateLock({
                     )}
                   </div>
                   <span className="text-[10px] text-slate-400 block">
-                    {selectedTarget.role === 'super_admin' ? 'Super Admin' : 'Kasir / Pengguna'}
+                    {selectedTarget.role === 'super_admin' ? 'Super Admin' : 'Kasir'}
                   </span>
                 </div>
               </div>

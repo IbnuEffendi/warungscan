@@ -703,7 +703,7 @@ export default function FinanceView({
       setNewWalletName('');
       setNewWalletBalance(0);
       setNewWalletScope('pribadi');
-      alert(`Dompet "${newW.name}" berhasil dibuat (${isShared ? 'Aset Toko / Bersama' : 'Aset Pribadi'}).`);
+      alert(`Dompet "${newW.name}" berhasil dibuat (${isShared ? 'Aset Toko' : 'Aset Pribadi'}).`);
     } catch (err: any) {
       onRefreshFinance();
       setIsAddingWallet(false);
@@ -803,7 +803,7 @@ export default function FinanceView({
   const handleDeleteWallet = async (walletToDelete: Wallet) => {
     triggerHaptic(30);
     const isShared = !walletToDelete.is_private || walletToDelete.type === 'cash_warung';
-    const confirmText = `Apakah Anda yakin ingin menghapus ${isShared ? 'dompet bersama / toko' : 'dompet pribadi'} "${walletToDelete.name}"?\nSaldo saat ini: ${formatRupiah(walletToDelete.balance)}`;
+    const confirmText = `Apakah Anda yakin ingin menghapus ${isShared ? 'dompet toko' : 'dompet pribadi'} "${walletToDelete.name}"?\nSaldo saat ini: ${formatRupiah(walletToDelete.balance)}`;
     if (!window.confirm(confirmText)) return;
 
     triggerHaptic(40);
@@ -1534,7 +1534,7 @@ export default function FinanceView({
           </button>
         </div>
 
-        {/* TOMBOL BANTU ORANG TUA: BELANJA KAS TOKO & KALKULATOR HPP */}
+        {/* TOMBOL BANTU: BELANJA KAS TOKO & KALKULATOR HPP */}
         <div className="grid grid-cols-2 gap-2 mt-2">
           <button
             type="button"
@@ -1546,7 +1546,7 @@ export default function FinanceView({
             style={{ minHeight: '44px' }}
           >
             <Store className="w-4 h-4 text-amber-950 shrink-0" />
-            <span className="truncate">Belanja Kas Toko (Modal Rp 0)</span>
+            <span className="truncate">Belanja Kas Toko</span>
           </button>
 
           <button
@@ -1559,7 +1559,7 @@ export default function FinanceView({
             style={{ minHeight: '44px' }}
           >
             <Calculator className="w-4 h-4 text-emerald-700 shrink-0" />
-            <span className="truncate">Kalkulator HPP Warung</span>
+            <span className="truncate">Kalkulator HPP</span>
           </button>
         </div>
       </div>
@@ -2041,7 +2041,7 @@ export default function FinanceView({
                 Daftar Dompet & Akun
               </h3>
               <p className="text-[11px] text-slate-500 font-medium">
-                Pemisahan terstruktur aset pribadi dan kas bersama / toko
+                Pemisahan aset pribadi dan kas toko
               </p>
             </div>
             <div className="flex items-center space-x-2">
@@ -2074,7 +2074,7 @@ export default function FinanceView({
             </div>
           </div>
 
-          {/* FILTER TAB PILLS (ASET PRIBADI / BERSAMA & TOKO / SEMUA) */}
+          {/* FILTER TAB PILLS (PRIBADI / TOKO / SEMUA) */}
           <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-100 rounded-2xl border border-slate-200">
             <button
               type="button"
@@ -2089,7 +2089,7 @@ export default function FinanceView({
               }`}
               style={{ minHeight: '44px' }}
             >
-              <span>Aset Pribadi</span>
+              <span>Pribadi</span>
               <span
                 className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
                   walletFilterTab === 'pribadi'
@@ -2114,7 +2114,7 @@ export default function FinanceView({
               }`}
               style={{ minHeight: '44px' }}
             >
-              <span>Aset Toko / Bersama</span>
+              <span>Toko</span>
               <span
                 className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
                   walletFilterTab === 'bersama'
@@ -2165,10 +2165,10 @@ export default function FinanceView({
             <div>
               <span className="text-[11px] font-bold block opacity-75">
                 {walletFilterTab === 'pribadi'
-                  ? 'Total Saldo Aset Pribadi'
+                  ? 'Total Saldo Pribadi'
                   : walletFilterTab === 'bersama'
-                  ? 'Total Saldo Aset Toko / Bersama'
-                  : 'Total Keseluruhan Saldo'}
+                  ? 'Total Saldo Toko'
+                  : 'Total Saldo'}
               </span>
               <span className="text-lg font-black block tracking-tight">
                 {formatRupiah(
@@ -2183,10 +2183,10 @@ export default function FinanceView({
             <div className="text-right">
               <span className="text-[10px] font-semibold px-2 py-1 rounded-lg bg-white/80 border border-black/5 block">
                 {walletFilterTab === 'pribadi'
-                  ? 'Privat (Hanya Anda)'
+                  ? 'Pribadi'
                   : walletFilterTab === 'bersama'
-                  ? 'Bersama Seluruh Kasir'
-                  : 'Total Komprehensif'}
+                  ? 'Kas Toko'
+                  : 'Semua Akun'}
               </span>
             </div>
           </div>
@@ -2209,12 +2209,12 @@ export default function FinanceView({
                   <div>
                     <h4 className="text-sm font-black text-slate-800">
                       {walletFilterTab === 'bersama'
-                        ? 'Tidak ada dompet bersama / toko'
+                        ? 'Tidak ada dompet toko'
                         : 'Belum ada dompet di kategori ini'}
                     </h4>
                     <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
                       {walletFilterTab === 'bersama'
-                        ? 'Dompet laci warung dapat dihapus jika tidak dipakai, atau Anda dapat menambahkan dompet bersama baru kapan pun.'
+                        ? 'Dompet laci warung dapat dihapus jika tidak dipakai, atau Anda dapat menambahkan dompet toko baru kapan pun.'
                         : 'Mulai kelola keuangan Anda dengan membuat dompet atau rekening baru.'}
                     </p>
                   </div>
@@ -2246,14 +2246,14 @@ export default function FinanceView({
                   return (
                     <div
                       key={wallet.id}
-                      className="p-3.5 bg-white rounded-2xl border border-slate-200 flex items-center justify-between shadow-2xs hover:border-slate-300 transition-all"
+                      className="p-3.5 bg-white rounded-2xl border border-slate-200 flex items-center justify-between gap-3 shadow-2xs hover:border-slate-300 transition-all"
                     >
-                      <div className="flex items-center space-x-3 min-w-0">
+                      <div className="flex items-center space-x-3 min-w-0 flex-1">
                         <div
-                          className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 ${
+                          className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
                             isWalletShared
-                              ? 'bg-emerald-100 text-emerald-900'
-                              : 'bg-amber-100 text-amber-900'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : 'bg-amber-100 text-amber-800'
                           }`}
                         >
                           {wallet.type === 'cash_warung' ? (
@@ -2266,62 +2266,60 @@ export default function FinanceView({
                             <WalletIcon className="w-5 h-5 text-amber-700" />
                           )}
                         </div>
-                        <div className="min-w-0">
-                          <div className="flex items-center space-x-2">
-                            <h4 className="text-xs font-extrabold text-slate-900 truncate">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center space-x-1.5">
+                            <h4 className="text-sm font-bold text-slate-900 truncate">
                               {wallet.name}
                             </h4>
-                            <span
-                              className={`text-[9px] font-black px-1.5 py-0.5 rounded-md ${
-                                isWalletShared
-                                  ? 'bg-emerald-100 text-emerald-800'
-                                  : 'bg-slate-100 text-slate-700'
-                              }`}
-                            >
-                              {isWalletShared ? 'Aset Bersama / Toko' : 'Aset Pribadi'}
-                            </span>
+                            {walletFilterTab === 'all' && (
+                              <span
+                                className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md shrink-0 ${
+                                  isWalletShared
+                                    ? 'bg-emerald-100 text-emerald-800'
+                                    : 'bg-slate-100 text-slate-600'
+                                }`}
+                              >
+                                {isWalletShared ? 'Toko' : 'Pribadi'}
+                              </span>
+                            )}
                           </div>
-                          <span className="text-[10px] text-slate-500 font-medium block truncate mt-0.5">
+                          <span className="text-[11px] text-slate-500 font-medium block truncate">
                             {wallet.type === 'cash_warung'
-                              ? 'Laci Toko Bersama'
+                              ? 'Kasir Toko'
                               : wallet.type === 'bank'
-                              ? 'Rekening Bank'
+                              ? 'Bank'
                               : wallet.type === 'ewallet'
                               ? 'E-Wallet'
-                              : 'Dompet Tunai Pribadi'}
+                              : 'Tunai'}
                           </span>
                         </div>
                       </div>
 
-                      <div className="flex items-center space-x-2 shrink-0">
-                        <div className="text-right mr-1">
-                          <p className="text-sm font-black text-slate-900">
-                            {formatRupiah(wallet.balance)}
-                          </p>
-                        </div>
+                      <div className="flex items-center space-x-1 shrink-0">
+                        <p className="text-sm font-extrabold text-slate-900 pr-1">
+                          {formatRupiah(wallet.balance)}
+                        </p>
 
-                        <div className="flex items-center space-x-1">
-                          <button
-                            type="button"
-                            onClick={() => handleOpenEditWallet(wallet)}
-                            className="p-2.5 rounded-xl text-slate-500 hover:text-amber-700 hover:bg-amber-50 active:scale-95 transition-all"
-                            title="Ubah Dompet"
-                            aria-label="Ubah Dompet"
-                            style={{ minWidth: '44px', minHeight: '44px' }}
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteWallet(wallet)}
-                            className="p-2.5 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 active:scale-95 transition-all"
-                            title="Hapus Dompet"
-                            aria-label="Hapus Dompet"
-                            style={{ minWidth: '44px', minHeight: '44px' }}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditWallet(wallet)}
+                          className="p-2 rounded-xl text-slate-400 hover:text-amber-700 hover:bg-amber-50 active:scale-95 transition-all"
+                          title="Ubah Dompet"
+                          aria-label="Ubah Dompet"
+                          style={{ minWidth: '44px', minHeight: '44px' }}
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteWallet(wallet)}
+                          className="p-2 rounded-xl text-slate-300 hover:text-rose-600 hover:bg-rose-50 active:scale-95 transition-all"
+                          title="Hapus Dompet"
+                          aria-label="Hapus Dompet"
+                          style={{ minWidth: '44px', minHeight: '44px' }}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
                   );
@@ -2664,7 +2662,7 @@ export default function FinanceView({
                     <div className="flex items-center justify-between text-xs font-bold">
                       <span className="text-slate-900">{b.category}</span>
                       <span className={isOver ? 'text-red-600 font-black' : 'text-slate-600'}>
-                        {formatRupiah(spent)} / {formatRupiah(b.monthly_limit)}
+                        {formatRupiah(spent)} dari {formatRupiah(b.monthly_limit)}
                       </span>
                     </div>
 
@@ -3039,7 +3037,7 @@ export default function FinanceView({
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Pilih Dompet / Sumber Dana</label>
+                <label className="block font-bold text-slate-700 mb-1">Pilih Dompet</label>
                 <select
                   value={txWalletId}
                   onChange={(e) => setTxWalletId(e.target.value)}
@@ -3069,14 +3067,14 @@ export default function FinanceView({
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Asal Transaksi / Bisnis</label>
+                <label className="block font-bold text-slate-700 mb-1">Asal Transaksi</label>
                 <select
                   value={txSource}
                   onChange={(e) => setTxSource(e.target.value as any)}
                   className="w-full p-2.5 rounded-xl border border-slate-300 font-bold bg-white"
                 >
-                  <option value="pribadi">Konsumsi Pribadi / Rumah Tangga</option>
-                  <option value="fb_marketplace">Jualan FB Marketplace / Online</option>
+                  <option value="pribadi">Konsumsi Pribadi</option>
+                  <option value="fb_marketplace">Jualan Online</option>
                   <option value="warung">Operasional Warung Toko</option>
                   <option value="bisnis_lain">Bisnis Lainnya</option>
                 </select>
@@ -3182,7 +3180,7 @@ export default function FinanceView({
         <div className="fixed inset-0 z-50 bg-black/75 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in">
           <div className="bg-white rounded-t-3xl sm:rounded-3xl max-w-sm w-full p-5 space-y-3.5 shadow-2xl">
             <div className="flex items-center justify-between pb-2 border-b border-slate-200">
-              <h3 className="font-black text-slate-900 text-sm">Tambah Dompet / Rekening</h3>
+              <h3 className="font-black text-slate-900 text-sm">Tambah Dompet</h3>
               <button
                 type="button"
                 onClick={() => setIsAddingWallet(false)}
@@ -3232,7 +3230,7 @@ export default function FinanceView({
                     }`}
                     style={{ minHeight: '44px' }}
                   >
-                    <span className="block text-xs">Aset Toko / Bersama</span>
+                    <span className="block text-xs">Aset Toko</span>
                     <span className="text-[10px] opacity-75 font-normal block">
                       Kas toko & keluarga
                     </span>
@@ -3241,7 +3239,7 @@ export default function FinanceView({
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Nama Dompet / Rekening</label>
+                <label className="block font-bold text-slate-700 mb-1">Nama Dompet</label>
                 <input
                   type="text"
                   required
@@ -3264,7 +3262,7 @@ export default function FinanceView({
                   className="w-full p-2.5 rounded-xl border border-slate-300 font-bold bg-white text-slate-900"
                 >
                   <option value="cash_pribadi">
-                    {newWalletScope === 'bersama' ? 'Uang Tunai Kasir / Toko' : 'Uang Tunai Pribadi'}
+                    {newWalletScope === 'bersama' ? 'Uang Tunai Kasir' : 'Uang Tunai Pribadi'}
                   </option>
                   <option value="bank">Rekening Bank (BCA, BRI, Mandiri, dll)</option>
                   <option value="ewallet">E-Wallet (Dana, OVO, Gopay, ShopeePay)</option>
@@ -3354,7 +3352,7 @@ export default function FinanceView({
                     }`}
                     style={{ minHeight: '44px' }}
                   >
-                    <span className="block text-xs">Aset Toko / Bersama</span>
+                    <span className="block text-xs">Aset Toko</span>
                     <span className="text-[10px] opacity-75 font-normal block">
                       Kas toko & keluarga
                     </span>
@@ -3363,7 +3361,7 @@ export default function FinanceView({
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Nama Dompet / Rekening</label>
+                <label className="block font-bold text-slate-700 mb-1">Nama Dompet</label>
                 <input
                   type="text"
                   required
@@ -3381,11 +3379,11 @@ export default function FinanceView({
                   className="w-full p-2.5 rounded-xl border border-slate-300 font-bold bg-white text-slate-900"
                 >
                   <option value="cash_pribadi">
-                    {editWalletScope === 'bersama' ? 'Uang Tunai Kasir / Toko' : 'Uang Tunai Pribadi'}
+                    {editWalletScope === 'bersama' ? 'Uang Tunai Kasir' : 'Uang Tunai Pribadi'}
                   </option>
                   <option value="bank">Rekening Bank (BCA, BRI, Mandiri, dll)</option>
                   <option value="ewallet">E-Wallet (Dana, OVO, Gopay, ShopeePay)</option>
-                  <option value="cash_warung">Laci Toko Bersama</option>
+                  <option value="cash_warung">Laci Kasir Warung</option>
                 </select>
               </div>
 
@@ -3473,7 +3471,7 @@ export default function FinanceView({
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Modal Beli / HPP (Rp)</label>
+                  <label className="block font-bold text-slate-700 mb-1">Modal Beli (Rp)</label>
                   <input
                     type="number"
                     required
@@ -3580,7 +3578,7 @@ export default function FinanceView({
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Harga Deal / pcs (Rp)</label>
+                  <label className="block font-bold text-slate-700 mb-1">Harga Deal (Rp)</label>
                   <input
                     type="number"
                     required
@@ -3841,10 +3839,10 @@ export default function FinanceView({
                 >
                   <option value="emas">Emas Logam Mulia (Gram)</option>
                   <option value="btc">Bitcoin (BTC)</option>
-                  <option value="tabungan">Tabungan / Kas Bank</option>
+                  <option value="tabungan">Tabungan Bank</option>
                   <option value="deposito">Deposito Bank</option>
                   <option value="reksadana">Reksadana</option>
-                  <option value="obligasi">Obligasi / SBN</option>
+                  <option value="obligasi">Obligasi Negara</option>
                 </select>
               </div>
 
@@ -3862,7 +3860,7 @@ export default function FinanceView({
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Jumlah Unit / Gram</label>
+                  <label className="block font-bold text-slate-700 mb-1">Jumlah Unit</label>
                   <input
                     type="number"
                     step="any"
@@ -3931,7 +3929,7 @@ export default function FinanceView({
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Dompet / Rekening</label>
+                <label className="block font-bold text-slate-700 mb-1">Dompet</label>
                 <select
                   value={editExpWalletId}
                   onChange={(e) => setEditExpWalletId(e.target.value)}
