@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Users, Shield, User, X, Check, Lock, Plus, Edit2, Trash2, KeyRound } from 'lucide-react';
 import { FamilyMember } from '@/types';
-import { triggerHaptic } from '@/lib/utils';
+import { triggerHaptic, generateUUID } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 
 interface FamilyAuthModalProps {
@@ -127,6 +127,7 @@ export default function FamilyAuthModal({
   };
 
   // 3. GANTI PIN AKUN SENDIRI
+  // 3. GANTI PIN AKUN SENDIRI
   const handleChangePin = async (e: React.FormEvent) => {
     e.preventDefault();
     setPinChangeError('');
@@ -151,18 +152,18 @@ export default function FamilyAuthModal({
     try {
       if (isDbConnected) {
         await supabase.from('family_members').update({ pin: updated.pin }).eq('id', updated.id);
-      } else {
-        const local: FamilyMember[] = JSON.parse(localStorage.getItem('warungscan_family') || '[]');
-        const updatedList = local.map((m) => (m.id === updated.id ? { ...m, pin: updated.pin } : m));
-        localStorage.setItem('warungscan_family', JSON.stringify(updatedList));
       }
+
+      const local: FamilyMember[] = JSON.parse(localStorage.getItem('warungscan_family') || '[]');
+      const updatedList = local.map((m) => (m.id === updated.id ? { ...m, pin: updated.pin } : m));
+      localStorage.setItem('warungscan_family', JSON.stringify(updatedList));
 
       onSelectMember(updated);
       onRefreshMembers();
       setIsChangingPin(false);
       setOldPinInput('');
       setNewPinInput('');
-      alert('PIN Anda berhasil diperbarui!');
+      alert('PIN Anda berhasil diperbarui di seluruh perangkat!');
     } catch (err: any) {
       setPinChangeError('Gagal mengubah PIN: ' + err.message);
     }
@@ -224,8 +225,9 @@ export default function FamilyAuthModal({
     if (!newName.trim()) return;
 
     triggerHaptic(30);
+    const newMemberId = generateUUID();
     const newMember: FamilyMember = {
-      id: 'fam-' + Date.now(),
+      id: newMemberId,
       name: newName.trim(),
       role: 'family_member',
       pin: newMemberPin.trim() || '1234',
@@ -236,15 +238,37 @@ export default function FamilyAuthModal({
     try {
       if (isDbConnected) {
         await supabase.from('family_members').insert({
+          id: newMember.id,
           name: newMember.name,
           role: newMember.role,
           pin: newMember.pin,
           avatar_color: newMember.avatar_color,
         });
+
+        // Buat dompet awal
+        await supabase.from('wallets').insert({
+          id: generateUUID(),
+          user_id: newMember.id,
+          name: `Dompet ${newMember.name}`,
+          type: 'cash_pribadi',
+          balance: 0,
+          is_private: true,
+        });
       } else {
         const local: FamilyMember[] = JSON.parse(localStorage.getItem('warungscan_family') || '[]');
         local.push(newMember);
         localStorage.setItem('warungscan_family', JSON.stringify(local));
+
+        const localWallets = JSON.parse(localStorage.getItem('warungscan_wallets') || '[]');
+        localWallets.push({
+          id: generateUUID(),
+          user_id: newMember.id,
+          name: `Dompet ${newMember.name}`,
+          type: 'cash_pribadi',
+          balance: 0,
+          is_private: true,
+        });
+        localStorage.setItem('warungscan_wallets', JSON.stringify(localWallets));
       }
 
       onRefreshMembers();

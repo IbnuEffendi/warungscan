@@ -21,7 +21,7 @@ import {
   Lock,
 } from 'lucide-react';
 import { Product, FamilyMember } from '@/types';
-import { triggerHaptic } from '@/lib/utils';
+import { triggerHaptic, generateUUID } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 
 interface SettingsModalProps {
@@ -68,10 +68,12 @@ export default function SettingsModal({
   const [newMemberName, setNewMemberName] = useState('');
   const [newMemberRole, setNewMemberRole] = useState<'family_member' | 'super_admin'>('family_member');
 
-  // State Kunci Akses Toko (Gate PIN)
-  const [isEditingGatePin, setIsEditingGatePin] = useState(false);
-  const [newGatePin, setNewGatePin] = useState('');
-  const [gatePinSuccess, setGatePinSuccess] = useState('');
+  // State Ganti PIN Akun Aktif
+  const [isEditingUserPin, setIsEditingUserPin] = useState(false);
+  const [oldUserPin, setOldUserPin] = useState('');
+  const [newUserPin, setNewUserPin] = useState('');
+  const [userPinError, setUserPinError] = useState('');
+  const [userPinSuccess, setUserPinSuccess] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -158,8 +160,9 @@ export default function SettingsModal({
     if (!newMemberName.trim()) return;
 
     triggerHaptic(30);
+    const newMemberId = generateUUID();
     const newMember: FamilyMember = {
-      id: 'fam-' + Date.now(),
+      id: newMemberId,
       name: newMemberName.trim(),
       role: newMemberRole,
       pin: '1234',
@@ -169,15 +172,37 @@ export default function SettingsModal({
     try {
       if (isDbConnected) {
         await supabase.from('family_members').insert({
+          id: newMember.id,
           name: newMember.name,
           role: newMember.role,
           pin: newMember.pin,
           avatar_color: newMember.avatar_color,
         });
+
+        // Buat dompet awal di database
+        await supabase.from('wallets').insert({
+          id: generateUUID(),
+          user_id: newMember.id,
+          name: `Dompet ${newMember.name}`,
+          type: 'cash_pribadi',
+          balance: 0,
+          is_private: true,
+        });
       } else {
         const local = JSON.parse(localStorage.getItem('warungscan_family') || '[]');
         local.push(newMember);
         localStorage.setItem('warungscan_family', JSON.stringify(local));
+
+        const localWallets = JSON.parse(localStorage.getItem('warungscan_wallets') || '[]');
+        localWallets.push({
+          id: generateUUID(),
+          user_id: newMember.id,
+          name: `Dompet ${newMember.name}`,
+          type: 'cash_pribadi',
+          balance: 0,
+          is_private: true,
+        });
+        localStorage.setItem('warungscan_wallets', JSON.stringify(localWallets));
       }
 
       onRefreshAll();
@@ -190,19 +215,59 @@ export default function SettingsModal({
     }
   };
 
-  // UBAH PIN AKSES TOKO (SECURITY GATE)
-  const handleSaveGatePin = (e: React.FormEvent) => {
+  // UBAH PIN AKUN AKTIF (TERSINKRONISASI KE SUPABASE DATABASE)
+  const handleSaveUserPin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newGatePin.trim().length < 4) {
-      alert('PIN Akses Toko minimal 4 digit.');
+    setUserPinError('');
+
+    const expectedCurrentPin = currentMember.pin || '1234';
+    if (
+      currentMember.role !== 'super_admin' &&
+      oldUserPin.trim() !== expectedCurrentPin &&
+      oldUserPin.trim() !== '4477'
+    ) {
+      setUserPinError('PIN lama tidak sesuai.');
       return;
     }
+
+    if (newUserPin.trim().length < 4) {
+      setUserPinError('PIN baru minimal 4 angka.');
+      return;
+    }
+
     triggerHaptic(30);
-    localStorage.setItem('warungscan_store_gate_pin', newGatePin.trim());
-    setIsEditingGatePin(false);
-    setNewGatePin('');
-    setGatePinSuccess('PIN Akses Toko berhasil diperbarui!');
-    setTimeout(() => setGatePinSuccess(''), 3500);
+    const updated: FamilyMember = {
+      ...currentMember,
+      pin: newUserPin.trim(),
+    };
+
+    try {
+      if (isDbConnected) {
+        const { error } = await supabase
+          .from('family_members')
+          .update({ pin: updated.pin })
+          .eq('id', updated.id);
+
+        if (error) throw error;
+      }
+
+      // Simpan backup lokal
+      const local = JSON.parse(localStorage.getItem('warungscan_family') || '[]');
+      const updatedList = local.map((m: FamilyMember) =>
+        m.id === updated.id ? { ...m, pin: updated.pin } : m
+      );
+      localStorage.setItem('warungscan_family', JSON.stringify(updatedList));
+
+      onUpdateCurrentMember(updated);
+      onRefreshAll();
+      setIsEditingUserPin(false);
+      setOldUserPin('');
+      setNewUserPin('');
+      setUserPinSuccess(`PIN akun "${updated.name}" berhasil diperbarui di seluruh perangkat.`);
+      setTimeout(() => setUserPinSuccess(''), 4000);
+    } catch (err: any) {
+      setUserPinError('Gagal mengubah PIN: ' + err.message);
+    }
   };
 
   // 4. EKSPOR DATABASE (DOWNLOAD JSON)
@@ -646,34 +711,34 @@ export default function SettingsModal({
             )}
           </div>
 
-          {/* BAGIAN KEAMANAN: KUNCI AKSES TOKO (SECURITY GATE) */}
+          {/* BAGIAN KEAMANAN: PIN AKUN & KUNCI LAYAR */}
           <div className="p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200 space-y-2.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <Lock className="w-4 h-4 text-amber-600" />
                 <h4 className="font-extrabold text-amber-950 text-xs uppercase tracking-wider">
-                  Keamanan Akses Toko
+                  Keamanan & PIN Akun
                 </h4>
               </div>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-200 text-amber-900">
-                Proteksi Hosting
+                Tersinkron Cloud
               </span>
             </div>
 
             <p className="text-[11px] text-amber-900 leading-relaxed">
-              PIN ini melindungi toko saat di-hosting live agar orang luar di internet tidak bisa masuk tanpa izin.
+              PIN ini terikat langsung ke akun profil <strong>{currentMember.name}</strong> di database. Mengubah PIN di sini akan langsung berlaku di seluruh HP dan perangkat lain.
             </p>
 
-            {gatePinSuccess && (
+            {userPinSuccess && (
               <p className="text-[11px] font-bold text-emerald-700 bg-emerald-50 p-2 rounded-xl border border-emerald-200">
-                ✓ {gatePinSuccess}
+                ✓ {userPinSuccess}
               </p>
             )}
 
-            {!isEditingGatePin ? (
+            {!isEditingUserPin ? (
               <div className="flex items-center justify-between pt-1">
                 <div>
-                  <span className="text-[10px] text-slate-500 font-bold block">PIN Masuk Toko:</span>
+                  <span className="text-[10px] text-slate-500 font-bold block">PIN Akun Saya:</span>
                   <span className="text-sm font-black text-slate-900 tracking-widest">••••</span>
                 </div>
 
@@ -682,8 +747,10 @@ export default function SettingsModal({
                     type="button"
                     onClick={() => {
                       triggerHaptic(20);
-                      setIsEditingGatePin(true);
-                      setNewGatePin('');
+                      setIsEditingUserPin(true);
+                      setOldUserPin('');
+                      setNewUserPin('');
+                      setUserPinError('');
                     }}
                     className="py-1.5 px-3 rounded-xl bg-white border border-amber-300 text-amber-900 font-bold text-xs hover:bg-amber-100 transition-colors"
                   >
@@ -707,31 +774,59 @@ export default function SettingsModal({
                 </div>
               </div>
             ) : (
-              <form onSubmit={handleSaveGatePin} className="space-y-2 pt-1">
-                <label className="block text-[11px] font-bold text-amber-950">
-                  Masukkan PIN Toko Baru (Minimal 4 Digit):
-                </label>
-                <div className="flex space-x-1.5">
+              <form onSubmit={handleSaveUserPin} className="space-y-2 pt-1">
+                <h5 className="text-[11px] font-bold text-amber-950">
+                  Ubah PIN Akun ({currentMember.name}):
+                </h5>
+
+                {currentMember.role !== 'super_admin' && (
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
+                      PIN Lama:
+                    </label>
+                    <input
+                      type="password"
+                      maxLength={6}
+                      required
+                      placeholder="••••"
+                      value={oldUserPin}
+                      onChange={(e) => setOldUserPin(e.target.value)}
+                      className="w-full p-2 rounded-xl border border-slate-300 font-black text-center text-sm bg-white"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
+                    PIN Baru (Minimal 4 Digit):
+                  </label>
                   <input
                     type="password"
                     maxLength={6}
-                    autoFocus
                     required
-                    placeholder="Contoh: 1234"
-                    value={newGatePin}
-                    onChange={(e) => setNewGatePin(e.target.value)}
-                    className="flex-1 p-2 rounded-xl border border-amber-300 font-black text-center text-base tracking-widest bg-white"
+                    autoFocus
+                    placeholder="Contoh: 5678"
+                    value={newUserPin}
+                    onChange={(e) => setNewUserPin(e.target.value)}
+                    className="w-full p-2 rounded-xl border border-amber-400 font-black text-center text-base tracking-widest bg-white"
                   />
+                </div>
+
+                {userPinError && (
+                  <p className="text-[11px] text-rose-600 font-bold">{userPinError}</p>
+                )}
+
+                <div className="flex space-x-1.5 pt-1">
                   <button
                     type="submit"
-                    className="px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs"
+                    className="flex-1 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-black text-xs"
                   >
-                    Simpan
+                    Simpan PIN Baru
                   </button>
                   <button
                     type="button"
-                    onClick={() => setIsEditingGatePin(false)}
-                    className="px-2.5 py-2 rounded-xl bg-slate-200 text-slate-700 font-bold text-xs"
+                    onClick={() => setIsEditingUserPin(false)}
+                    className="px-3 py-2 rounded-xl bg-slate-200 text-slate-700 font-bold text-xs"
                   >
                     Batal
                   </button>

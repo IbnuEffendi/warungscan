@@ -483,7 +483,7 @@ export default function GuidebookModal({ isOpen, onClose }: GuidebookModalProps)
                     <span className="text-slate-400 group-open:rotate-180 transition-transform">▼</span>
                   </summary>
                   <p className="mt-2 text-slate-600 pt-2 border-t border-slate-100">
-                    Aplikasi ini dilindungi oleh gerbang <strong>Kunci Akses Toko</strong>. Siapa pun yang membuka tautan situs web tidak akan bisa melihat apa pun tanpa memasukkan PIN Akses Toko (Default: <code className="bg-slate-100 px-1 py-0.5 rounded font-bold">1234</code>). Anda bisa mengganti PIN ini kapan saja di menu Pengaturan.
+                    Aplikasi ini dilindungi oleh gerbang <strong>Kunci Akun Profil & PIN Database</strong>. Siapa pun yang membuka tautan situs web di perangkat baru wajib memilih profil akun dan memasukkan PIN akun tersebut (Default: <code className="bg-slate-100 px-1 py-0.5 rounded font-bold">1234</code>). Setiap anggota keluarga memiliki PIN tersendiri yang tersimpan di database Supabase. Jika PIN diubah, perubahan langsung berlaku di semua perangkat secara otomatis.
                   </p>
                 </details>
 
@@ -493,7 +493,7 @@ export default function GuidebookModal({ isOpen, onClose }: GuidebookModalProps)
                     <span className="text-slate-400 group-open:rotate-180 transition-transform">▼</span>
                   </summary>
                   <p className="mt-2 text-slate-600 pt-2 border-t border-slate-100">
-                    Cukup tekan ikon <strong>Gembok (Kunci Toko)</strong> di bar atas. Layar akan langsung terkunci dan membutuhkan PIN untuk membukanya kembali.
+                    Cukup tekan ikon <strong>Gembok</strong> di bar atas atau tombol <strong>Kunci Sekarang</strong> di Pengaturan. Layar akan langsung terkunci dan meminta PIN akun Anda untuk membukanya kembali.
                   </p>
                 </details>
 

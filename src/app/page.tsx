@@ -14,7 +14,6 @@ import SelfConsumptionModal from '@/components/SelfConsumptionModal';
 import FamilyAuthModal from '@/components/FamilyAuthModal';
 import AppGateLock from '@/components/AppGateLock';
 import GuidebookModal from '@/components/GuidebookModal';
-import NewDeviceAuthModal from '@/components/NewDeviceAuthModal';
 import {
   Product,
   CartItem,
@@ -79,18 +78,22 @@ export default function Home() {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isSelfConsumptionModalOpen, setIsSelfConsumptionModalOpen] = useState(false);
   const [isGuidebookOpen, setIsGuidebookOpen] = useState(false);
-  const [isNewDeviceModalOpen, setIsNewDeviceModalOpen] = useState(false);
 
-  // Security Gate Lock Toko
+  // Security Gate Lock Toko & Multi-User Pin
   const [isGateUnlocked, setIsGateUnlocked] = useState(false);
   const [hasCheckedGate, setHasCheckedGate] = useState(false);
 
   useEffect(() => {
     try {
+      const savedUserId = localStorage.getItem('warungscan_active_user_id');
       const isSessionUnlocked = sessionStorage.getItem('warungscan_gate_unlocked') === 'true';
       const rememberUntil = Number(localStorage.getItem('warungscan_gate_remember_until') || 0);
-      if (isSessionUnlocked || rememberUntil > Date.now()) {
+
+      // Hanya otomatis terbuka jika sudah ada akun tersimpan di perangkat ini DAN sesi masih aktif
+      if (savedUserId && (isSessionUnlocked || rememberUntil > Date.now())) {
         setIsGateUnlocked(true);
+      } else {
+        setIsGateUnlocked(false);
       }
     } catch {
       // Fallback
@@ -152,8 +155,8 @@ export default function Home() {
             if (matched) setCurrentMember(matched);
             else setCurrentMember(famData[0]);
           } else {
-            // Perangkat Baru! Belum login ke profil akun tertentu
-            setIsNewDeviceModalOpen(true);
+            // Perangkat Baru! Kunci layar untuk memilih akun
+            setIsGateUnlocked(false);
           }
         }
 
@@ -176,7 +179,7 @@ export default function Home() {
               if (matched) setCurrentMember(matched);
               else setCurrentMember(parsed[0]);
             } else {
-              setIsNewDeviceModalOpen(true);
+              setIsGateUnlocked(false);
             }
           }
         }
@@ -213,9 +216,17 @@ export default function Home() {
 
   return (
     <main className="flex flex-col min-h-screen bg-slate-100">
-      {/* Keamanan Gerbang Kunci Toko (Proteksi Hosting & Orang Luar) */}
+      {/* Keamanan Gerbang Kunci & Login Akun Profil */}
       {hasCheckedGate && !isGateUnlocked && (
-        <AppGateLock onUnlock={() => setIsGateUnlocked(true)} />
+        <AppGateLock
+          currentMember={currentMember}
+          familyMembers={familyMembers}
+          onUnlock={(member) => {
+            setCurrentMember(member);
+            setIsGateUnlocked(true);
+          }}
+          isDbConnected={isDbConnected}
+        />
       )}
 
       {/* Header Aplikasi */}
@@ -315,18 +326,7 @@ export default function Home() {
         onUnlockSuperAdmin={handleElevateSuperAdmin}
       />
 
-      {/* MODAL PERANGKAT BARU: PILIH AKUN LAMA ATAU BUAT AKUN BARU */}
-      <NewDeviceAuthModal
-        isOpen={isNewDeviceModalOpen}
-        familyMembers={familyMembers}
-        onSelectMember={(m) => {
-          setCurrentMember(m);
-          localStorage.setItem('warungscan_active_user_id', m.id);
-          setIsNewDeviceModalOpen(false);
-        }}
-        onRefreshMembers={loadFinanceData}
-        isDbConnected={isDbConnected}
-      />
+
 
       {/* MODAL PANDUAN DATABASE SUPABASE */}
       <DatabaseModal
