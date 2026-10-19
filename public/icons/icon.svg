@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#16a34a" />
+      <stop offset="100%" stop-color="#15803d" />
+    </linearGradient>
+  </defs>
+  <!-- Background with rounded corners -->
+  <rect width="512" height="512" rx="110" fill="url(#grad)" />
+  <!-- Shopping Bag and Scanner Graphic -->
+  <g fill="none" stroke="#ffffff" stroke-width="28" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Handle -->
+    <path d="M190 200 V 150 A 66 66 0 0 1 322 150 V 200" />
+    <!-- Bag body -->
+    <rect x="120" y="200" width="272" height="230" rx="24" fill="#ffffff" fill-opacity="0.1" />
+    <!-- Barcode scan lines inside bag -->
+    <line x1="170" y1="260" x2="170" y2="350" stroke-width="22" />
+    <line x1="210" y1="260" x2="210" y2="350" stroke-width="14" />
+    <line x1="244" y1="260" x2="244" y2="350" stroke-width="20" />
+    <line x1="280" y1="260" x2="280" y2="350" stroke-width="12" />
+    <line x1="316" y1="260" x2="316" y2="350" stroke-width="22" />
+    <line x1="344" y1="260" x2="344" y2="350" stroke-width="14" />
+    <!-- Scan laser line -->
+    <line x1="140" y1="305" x2="372" y2="305" stroke="#facc15" stroke-width="18" />
+  </g>
+</svg>

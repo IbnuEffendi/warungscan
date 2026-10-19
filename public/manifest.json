@@ -1,0 +1,18 @@
+{
+  "name": "WarungScan - Kasir & Stok Warung",
+  "short_name": "WarungScan",
+  "description": "Aplikasi kasir pintar dan restok belanja via foto struk untuk warung mandiri.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#15803d",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

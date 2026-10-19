@@ -1,69 +1,346 @@
-import Image from "next/image";
+'use client';
+
+import React, { useState, useEffect, useCallback } from 'react';
+import Header from '@/components/Header';
+import Navbar, { TabType } from '@/components/Navbar';
+import PosView from '@/components/PosView';
+import RestockView from '@/components/RestockView';
+import InventoryView from '@/components/InventoryView';
+import FinanceView from '@/components/FinanceView';
+import ReportsView from '@/components/ReportsView';
+import DatabaseModal from '@/components/DatabaseModal';
+import SettingsModal from '@/components/SettingsModal';
+import SelfConsumptionModal from '@/components/SelfConsumptionModal';
+import FamilyAuthModal from '@/components/FamilyAuthModal';
+import AppGateLock from '@/components/AppGateLock';
+import GuidebookModal from '@/components/GuidebookModal';
+import {
+  Product,
+  CartItem,
+  FamilyMember,
+  Wallet,
+  PersonalExpense,
+  FinancialGoal,
+} from '@/types';
+import { supabase } from '@/lib/supabase';
+import { AlertCircle, X } from 'lucide-react';
+
+const DEFAULT_SAMPLE_PRODUCTS: Product[] = [
+  // Sembako
+  { id: 'sample-1', name: 'Beras Ramos 5kg', cost_price: 65000, selling_price: 72000, stock: 10, category: 'Sembako' },
+  { id: 'sample-2', name: 'Minyak Goreng 1L', cost_price: 15500, selling_price: 18000, stock: 4, category: 'Sembako' },
+  { id: 'sample-3', name: 'Telur Ayam 1kg', cost_price: 26000, selling_price: 29000, stock: 3, category: 'Sembako' },
+  { id: 'sample-4', name: 'Gula Pasir 1kg', cost_price: 16000, selling_price: 18000, stock: 2, category: 'Sembako' },
+  { id: 'sample-5', name: 'Indomie Goreng Original', cost_price: 2800, selling_price: 3500, stock: 40, category: 'Makanan' },
+  { id: 'sample-6', name: 'Aqua Galon 19L', cost_price: 19000, selling_price: 22000, stock: 2, category: 'Minuman' },
+  // Minuman & Makanan Olahan Warung
+  { id: 'sample-7', name: 'Es Teh Manis Jumbo', cost_price: 1200, selling_price: 3000, stock: 99, category: 'Minuman Seduh' },
+  { id: 'sample-8', name: 'Kopi Kapal Api Seduh Panas', cost_price: 1500, selling_price: 4000, stock: 99, category: 'Minuman Seduh' },
+  { id: 'sample-9', name: 'Pop Mie Seduh Air Panas', cost_price: 5500, selling_price: 8000, stock: 20, category: 'Minuman Seduh' },
+  { id: 'sample-10', name: 'Tahu Walik Crispy (1 Porsi/5 pcs)', cost_price: 3000, selling_price: 5000, stock: 30, category: 'Makanan Olahan' },
+  { id: 'sample-11', name: 'Telur Rebus Matang', cost_price: 2000, selling_price: 3000, stock: 25, category: 'Makanan Olahan' },
+  { id: 'sample-12', name: 'Donat Kampung Gula Halus', cost_price: 1500, selling_price: 2500, stock: 20, category: 'Makanan Olahan' },
+  // Pulsa & PPOB
+  { id: 'sample-13', name: 'Pulsa Reguler 10.000', cost_price: 10500, selling_price: 12000, stock: 999, category: 'Pulsa & PPOB' },
+  { id: 'sample-14', name: 'Token Listrik PLN 20.000', cost_price: 20500, selling_price: 23000, stock: 999, category: 'Pulsa & PPOB' },
+];
+
+// Default akun: Hanya 1 user awal dengan format UUID valid
+export const DEFAULT_USER_ID = '00000000-0000-0000-0000-000000000001';
+
+const DEFAULT_FAMILY_MEMBERS: FamilyMember[] = [
+  { id: DEFAULT_USER_ID, name: 'Kasir Utama', role: 'family_member', pin: '1234', avatar_color: 'blue' },
+];
+
+const DEFAULT_WALLETS: Wallet[] = [
+  { id: '00000000-0000-0000-0000-000000000011', user_id: DEFAULT_USER_ID, name: 'Laci Kasir Warung', type: 'cash_warung', balance: 500000, is_private: false },
+  { id: '00000000-0000-0000-0000-000000000012', user_id: DEFAULT_USER_ID, name: 'Dompet Pribadi', type: 'cash_pribadi', balance: 250000, is_private: true },
+];
 
 export default function Home() {
+  const [activeTab, setActiveTab] = useState<TabType>('pos');
+  const [products, setProducts] = useState<Product[]>([]);
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [isDbConnected, setIsDbConnected] = useState(false);
+  const [hasCheckedDb, setHasCheckedDb] = useState(false);
+
+  // State Multi-User & Keluarga (Default user biasa)
+  const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>(DEFAULT_FAMILY_MEMBERS);
+  const [currentMember, setCurrentMember] = useState<FamilyMember>(DEFAULT_FAMILY_MEMBERS[0]);
+  const [isFamilyAuthOpen, setIsFamilyAuthOpen] = useState(false);
+
+  // State Dompet & Keuangan
+  const [wallets, setWallets] = useState<Wallet[]>(DEFAULT_WALLETS);
+  const [personalExpenses, setPersonalExpenses] = useState<PersonalExpense[]>([]);
+
+  // State Modals
+  const [isDbModalOpen, setIsDbModalOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [isSelfConsumptionModalOpen, setIsSelfConsumptionModalOpen] = useState(false);
+  const [isGuidebookOpen, setIsGuidebookOpen] = useState(false);
+
+  // Security Gate Lock Toko
+  const [isGateUnlocked, setIsGateUnlocked] = useState(false);
+  const [hasCheckedGate, setHasCheckedGate] = useState(false);
+
+  useEffect(() => {
+    try {
+      const isSessionUnlocked = sessionStorage.getItem('warungscan_gate_unlocked') === 'true';
+      const rememberUntil = Number(localStorage.getItem('warungscan_gate_remember_until') || 0);
+      if (isSessionUnlocked || rememberUntil > Date.now()) {
+        setIsGateUnlocked(true);
+      }
+    } catch {
+      // Fallback
+    } finally {
+      setHasCheckedGate(true);
+    }
+  }, []);
+
+  const handleLockApp = () => {
+    try {
+      sessionStorage.removeItem('warungscan_gate_unlocked');
+      localStorage.removeItem('warungscan_gate_remember_until');
+    } catch {}
+    setIsGateUnlocked(false);
+  };
+
+  // Ambil Data Produk
+  const loadProducts = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .order('name', { ascending: true });
+
+      if (error || !data || data.length === 0) {
+        setIsDbConnected(false);
+        const stored = localStorage.getItem('warungscan_products');
+        if (stored) {
+          setProducts(JSON.parse(stored));
+        } else {
+          setProducts(DEFAULT_SAMPLE_PRODUCTS);
+          localStorage.setItem('warungscan_products', JSON.stringify(DEFAULT_SAMPLE_PRODUCTS));
+        }
+      } else {
+        setIsDbConnected(true);
+        setProducts(data);
+        localStorage.setItem('warungscan_products', JSON.stringify(data));
+      }
+    } catch {
+      setIsDbConnected(false);
+      const stored = localStorage.getItem('warungscan_products');
+      setProducts(stored ? JSON.parse(stored) : DEFAULT_SAMPLE_PRODUCTS);
+    } finally {
+      setHasCheckedDb(true);
+    }
+  }, []);
+
+  // Ambil Data Keluarga, Dompet, Pengeluaran & Goal
+  const loadFinanceData = useCallback(async () => {
+    try {
+      if (isDbConnected) {
+        const { data: famData } = await supabase.from('family_members').select('*');
+        if (famData && famData.length > 0) {
+          setFamilyMembers(famData);
+          setCurrentMember((prev) => {
+            const found = famData.find((m) => m.id === prev.id);
+            return found || famData[0];
+          });
+        }
+
+        const { data: walData } = await supabase.from('wallets').select('*');
+        if (walData && walData.length > 0) setWallets(walData);
+
+        const { data: expData } = await supabase
+          .from('personal_expenses')
+          .select('*')
+          .order('created_at', { ascending: false });
+        if (expData) setPersonalExpenses(expData);
+      } else {
+        const localFam = localStorage.getItem('warungscan_family');
+        if (localFam) {
+          const parsed = JSON.parse(localFam);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setFamilyMembers(parsed);
+            setCurrentMember((prev) => parsed.find((m: any) => m.id === prev.id) || parsed[0]);
+          }
+        }
+
+        const localWallets = localStorage.getItem('warungscan_wallets');
+        if (localWallets) setWallets(JSON.parse(localWallets));
+
+        const localExp = localStorage.getItem('warungscan_personal_expenses');
+        if (localExp) setPersonalExpenses(JSON.parse(localExp));
+      }
+    } catch (err) {
+      console.warn('Finance data load notice:', err);
+    }
+  }, [isDbConnected]);
+
+  useEffect(() => {
+    loadProducts();
+  }, [loadProducts]);
+
+  useEffect(() => {
+    loadFinanceData();
+  }, [loadFinanceData]);
+
+  const handleElevateSuperAdmin = () => {
+    const updated: FamilyMember = {
+      ...currentMember,
+      role: 'super_admin',
+    };
+    setCurrentMember(updated);
+    setFamilyMembers((prev) =>
+      prev.map((m) => (m.id === updated.id ? updated : m))
+    );
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <main className="flex flex-col min-h-screen bg-slate-100">
+      {/* Keamanan Gerbang Kunci Toko (Proteksi Hosting & Orang Luar) */}
+      {hasCheckedGate && !isGateUnlocked && (
+        <AppGateLock onUnlock={() => setIsGateUnlocked(true)} />
+      )}
+
+      {/* Header Aplikasi */}
+      <Header
+        currentMember={currentMember}
+        onOpenFamilyAuth={() => setIsFamilyAuthOpen(true)}
+        onOpenReports={() => setActiveTab('reports')}
+        onOpenSettings={() => setIsSettingsModalOpen(true)}
+        isDbConnected={isDbConnected}
+        onOpenDbModal={() => setIsDbModalOpen(true)}
+        onElevateSuperAdmin={handleElevateSuperAdmin}
+        onOpenGuidebook={() => setIsGuidebookOpen(true)}
+        onLockApp={handleLockApp}
+      />
+
+      {/* Banner Peringatan jika Supabase belum dipasang tabel */}
+      {hasCheckedDb && !isDbConnected && (
+        <div
+          onClick={() => setIsDbModalOpen(true)}
+          className="bg-amber-500 text-slate-900 px-3 py-1.5 text-xs font-bold flex items-center justify-between cursor-pointer border-b border-amber-600 shadow-xs"
+        >
+          <div className="flex items-center space-x-1.5">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>Database Cloud belum dipasang tabel. Klik untuk cara pasang (1 menit).</span>
+          </div>
+          <span className="underline ml-1 shrink-0 font-extrabold">Pasang</span>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+      )}
+
+      {/* Konten Halaman sesuai Tab yang Aktif */}
+      <div className="flex-1 flex flex-col pb-20">
+        {activeTab === 'pos' && (
+          <PosView
+            products={products}
+            onProductsUpdate={loadProducts}
+            cart={cart}
+            setCart={setCart}
+            isDbConnected={isDbConnected}
+          />
+        )}
+
+        {activeTab === 'restock' && (
+          <RestockView
+            products={products}
+            onProductsUpdate={loadProducts}
+            isDbConnected={isDbConnected}
+          />
+        )}
+
+        {activeTab === 'inventory' && (
+          <InventoryView
+            products={products}
+            onProductsUpdate={loadProducts}
+            isDbConnected={isDbConnected}
+            onOpenSelfConsumption={() => setIsSelfConsumptionModalOpen(true)}
+            onGoToRestock={() => setActiveTab('restock')}
+          />
+        )}
+
+        {activeTab === 'reports' && (
+          <ReportsView
+            isDbConnected={isDbConnected}
+            onProductsUpdate={loadProducts}
+          />
+        )}
+
+        {activeTab === 'finance' && (
+          <FinanceView
+            currentMember={currentMember}
+            wallets={wallets}
+            expenses={personalExpenses}
+            onRefreshFinance={loadFinanceData}
+            isDbConnected={isDbConnected}
+          />
+        )}
+      </div>
+
+      {/* Navigasi Bar Bawah (Kasir, Kulakan, Stok & Belanja, Laporan, Keuangan) */}
+      <Navbar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        cartCount={cart.reduce((sum, item) => sum + item.qty, 0)}
+      />
+
+      {/* MODAL MULTI-USER KELUARGA & PIN LOCK */}
+      <FamilyAuthModal
+        isOpen={isFamilyAuthOpen}
+        onClose={() => setIsFamilyAuthOpen(false)}
+        currentMember={currentMember}
+        onSelectMember={(m) => setCurrentMember(m)}
+        familyMembers={familyMembers}
+        onRefreshMembers={loadFinanceData}
+        isDbConnected={isDbConnected}
+        onUnlockSuperAdmin={handleElevateSuperAdmin}
+      />
+
+      {/* MODAL PANDUAN DATABASE SUPABASE */}
+      <DatabaseModal
+        isOpen={isDbModalOpen}
+        onClose={() => setIsDbModalOpen(false)}
+        isDbConnected={isDbConnected}
+        onRefreshDb={loadProducts}
+      />
+
+      {/* MODAL PENGATURAN (EXPORT, IMPORT, RESET, UPGRADE SUPER ADMIN, UBAH NAMA) */}
+      <SettingsModal
+        isOpen={isSettingsModalOpen}
+        onClose={() => setIsSettingsModalOpen(false)}
+        products={products}
+        currentMember={currentMember}
+        onUpdateCurrentMember={(updated) => {
+          setCurrentMember(updated);
+          setFamilyMembers((prev) =>
+            prev.map((m) => (m.id === updated.id ? updated : m))
+          );
+        }}
+        familyMembers={familyMembers}
+        onRefreshAll={() => {
+          loadProducts();
+          loadFinanceData();
+        }}
+        isDbConnected={isDbConnected}
+        onLockApp={handleLockApp}
+      />
+
+      {/* MODAL CATAT PAKAI SENDIRI */}
+      <SelfConsumptionModal
+        isOpen={isSelfConsumptionModalOpen}
+        onClose={() => setIsSelfConsumptionModalOpen(false)}
+        products={products}
+        onSuccess={loadProducts}
+        isDbConnected={isDbConnected}
+      />
+
+      {/* BUKU PANDUAN & FAQ LENGKAP (SELALU ADA DI HEADER ATAS) */}
+      <GuidebookModal
+        isOpen={isGuidebookOpen}
+        onClose={() => setIsGuidebookOpen(false)}
+      />
+    </main>
   );
 }
